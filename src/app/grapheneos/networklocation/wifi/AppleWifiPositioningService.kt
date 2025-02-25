@@ -16,17 +16,13 @@ import javax.net.ssl.HttpsURLConnection
 import kotlin.math.max
 
 private const val TAG = "AppleWps"
+private const val EXTRA_VERBOSE_TAG = "AppleWpsVV"
 
 class AppleWifiPositioningService : WifiPositioningService {
 
     @Throws(IOException::class)
     override fun fetchNearbyApPositioningData(bssid: Bssid, maxResultsHint: Int): List<WifiApPositioningData> {
         val response = fetchInner(bssid, maxResultsHint)
-        verboseLog(TAG) {
-            "request bssid $bssid, response: " + response.accessPointList.map {
-                it.bssid + "_" + (convertPositioningData(it.positioningData) ?: "(no positioning data)")
-            }
-        }
 
         val result = mutableListOf<WifiApPositioningData>()
 
@@ -39,7 +35,7 @@ class AppleWifiPositioningService : WifiPositioningService {
             result.add(WifiApPositioningData(apBssid, convertPositioningData(ap.positioningData)))
         }
         if (!result.any { it.bssid == bssid }) {
-            // server didn't return positioning data for the requested bssid
+            Log.d(TAG, "server didn't return positioning data for the requested bssid $bssid")
             result.add(0, WifiApPositioningData(bssid, positioningData = null))
         }
         return result
@@ -86,12 +82,24 @@ class AppleWifiPositioningService : WifiPositioningService {
             if (responseCode != HttpURLConnection.HTTP_OK) {
                 throw IOException("non-200 response code: $responseCode")
             }
-            val res = connection.inputStream.use { inputStream ->
-                inputStream.skip(10)
-                AppleWpsProtos.Response.parseFrom(inputStream)
+            val ignoredHeaderSize = 10
+            val protoBytes: ByteArray = connection.inputStream.use { inputStream ->
+                inputStream.skip(ignoredHeaderSize.toLong())
+                inputStream.readAllBytes()
             }
-            verboseLog(TAG) {"response: ${res.accessPointList.map { it.bssid }}"}
-            return res
+            val response = AppleWpsProtos.Response.parseFrom(protoBytes)
+            verboseLog(TAG) {
+                "response AP list size: ${response.accessPointCount}, " +
+                        "byte size: ${protoBytes.size + ignoredHeaderSize}"
+            }
+            if (Log.isLoggable(EXTRA_VERBOSE_TAG, Log.VERBOSE)) {
+                Log.v(EXTRA_VERBOSE_TAG, "response headers: " + connection.headerFields)
+                response.accessPointList.forEachIndexed { i, ap ->
+                    Log.v(EXTRA_VERBOSE_TAG, "response[$i]: bssid: ${ap.bssid}, " +
+                            "positioning data: ${convertPositioningData(ap.positioningData)}")
+                }
+            }
+            return response
         } finally {
             connection.disconnect()
         }
