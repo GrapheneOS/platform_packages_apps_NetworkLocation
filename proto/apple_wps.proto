@@ -6,7 +6,9 @@ option java_outer_classname = "AppleWpsProtos";
 
 message Request {
   repeated BssidWrapper bssid_wrapper = 2;
-  int32 max_number_of_results = 4;
+  // If successful, it seems like it may return x amount of additional access point along with the
+  // ones we asked for. Minimum seems to be 1, at 0 it returns 400 additional access points.
+  int32 number_of_additional_successful_results = 4;
 }
 
 message BssidWrapper {

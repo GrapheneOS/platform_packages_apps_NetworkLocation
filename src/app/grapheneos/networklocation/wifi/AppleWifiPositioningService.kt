@@ -13,15 +13,17 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
-import kotlin.random.Random
 
 private const val TAG = "AppleWps"
 
 class AppleWifiPositioningService : WifiPositioningService {
 
     @Throws(IOException::class)
-    override fun fetchNearbyApPositioningData(bssid: Bssid, maxResultsHint: Int): List<WifiApPositioningData> {
-        val response = fetchInner(bssid, maxResultsHint)
+    override fun fetchNearbyApPositioningData(
+        bssid: Bssid,
+        additionalSuccessfulResultsHint: Int
+    ): List<WifiApPositioningData> {
+        val response = fetchInner(bssid, additionalSuccessfulResultsHint)
         verboseLog(TAG) {
             "request bssid $bssid, response: " + response.accessPointList.map {
                 it.bssid + "_" + (convertPositioningData(it.positioningData) ?: "(no positioning data)")
@@ -46,7 +48,10 @@ class AppleWifiPositioningService : WifiPositioningService {
     }
 
     @Throws(IOException::class)
-    private fun fetchInner(bssid: Bssid, maxResultsHint: Int): AppleWpsProtos.Response {
+    private fun fetchInner(
+        bssid: Bssid,
+        additionalSuccessfulResultsHint: Int
+    ): AppleWpsProtos.Response {
         val url = getServerUrl()
 
         verboseLog(TAG) {"request bssid: $bssid"}
@@ -73,7 +78,7 @@ class AppleWifiPositioningService : WifiPositioningService {
 
                 val body = AppleWpsProtos.Request.newBuilder().run {
                     addBssidWrapper(AppleWpsProtos.BssidWrapper.newBuilder().setBssid(bssid).build())
-                    setMaxNumberOfResults(maxResultsHint)
+                    setNumberOfAdditionalSuccessfulResults(additionalSuccessfulResultsHint)
                     build()
                 }
 

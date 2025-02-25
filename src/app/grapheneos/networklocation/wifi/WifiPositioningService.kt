@@ -4,7 +4,10 @@ import java.io.IOException
 
 interface WifiPositioningService {
     @Throws(IOException::class)
-    fun fetchNearbyApPositioningData(bssid: String, maxResultsHint: Int): List<WifiApPositioningData>
+    fun fetchNearbyApPositioningData(
+        bssid: String,
+        additionalSuccessfulResultsHint: Int
+    ): List<WifiApPositioningData>
 }
 
 class WifiApPositioningData(
