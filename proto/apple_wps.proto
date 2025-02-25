@@ -6,7 +6,9 @@ option java_outer_classname = "AppleWpsProtos";
 
 message Request {
   repeated BssidWrapper bssid_wrapper = 2;
-  int32 max_number_of_results = 4;
+  // Max number of additional nearby access points that can be included in the response.
+  // Should be at least 1, otherwise it defaults to around 400
+  int32 max_additional_results = 4;
 }
 
 message BssidWrapper {

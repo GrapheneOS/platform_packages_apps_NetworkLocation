@@ -13,7 +13,7 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
-import kotlin.random.Random
+import kotlin.math.max
 
 private const val TAG = "AppleWps"
 
@@ -73,7 +73,8 @@ class AppleWifiPositioningService : WifiPositioningService {
 
                 val body = AppleWpsProtos.Request.newBuilder().run {
                     addBssidWrapper(AppleWpsProtos.BssidWrapper.newBuilder().setBssid(bssid).build())
-                    setMaxNumberOfResults(maxResultsHint)
+                    // should be at least 1, otherwise it defaults to around 400
+                    setMaxAdditionalResults(max(1, maxResultsHint - 1))
                     build()
                 }
 
