@@ -13,7 +13,7 @@ private const val TAG = "WifiPositioningServiceCache"
 
 typealias Bssid = String
 
-private const val CACHE_CAPACITY = 1000
+private const val CACHE_CAPACITY = 10_000
 // max number of WifiApPositioningData entries that service should return in a single call
 private const val MAX_RESPONSE_SIZE = 100
 private const val CACHE_CLEANUP_INTERVAL_MILLIS: Long = 15 * 60_000L // 15 minutes
