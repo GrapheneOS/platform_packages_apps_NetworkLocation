@@ -35,13 +35,14 @@ private const val EARTH_RADIUS = 6378137.0
  */
 private const val RSSI_VARIANCE = 4.0
 
-data class GeoPoint(val latitude: Double, val longitude: Double)
+data class GeoPoint(val latitude: Double, val longitude: Double, val altitude: Double?)
 
-data class Point(val x: Double, val y: Double)
+data class Point(val x: Double, val y: Double, val z: Double?)
 
 data class Measurement(
-    val apPosition: Point,
-    val apPositionVariance: Double, // variance of the AP position (in meters squared)
+    val position: Point,
+    val xyPositionVariance: Double, // variance of the xy position (in meters squared)
+    val zPositionVariance: Double?, // variance of the z position (in meters squared)
     val rssi: Double
 )
 
@@ -49,7 +50,8 @@ private class MeasurementExt(val measurement: Measurement, val pathLossExponent:
 
 private data class TrilaterationResult(
     val estimatedPosition: Point,
-    val accuracyRadius: Double // confidence radius (in meters)
+    val xyAccuracyRadius: Double, // confidence radius (in meters)
+    val zAccuracyRadius: Double? // confidence radius (in meters)
 )
 
 /**
@@ -71,7 +73,7 @@ private fun rssiVarianceToDistanceVariance(rssi: Double, pathLossExponent: Doubl
 
 private fun totalMeasurementVariance(measurement: Measurement, pathLossExponent: Double): Double {
     val distanceVariance = rssiVarianceToDistanceVariance(measurement.rssi, pathLossExponent)
-    return distanceVariance + measurement.apPositionVariance
+    return distanceVariance + measurement.xyPositionVariance
 }
 
 private fun computeMeasurementWeights(
@@ -115,7 +117,7 @@ private fun nonlinearLeastSquaresTrilateration(
     val observedDistances =
         measurements.map { rssiToDistance(it.measurement.rssi, it.pathLossExponent) }.toDoubleArray()
     val positions =
-        measurements.map { doubleArrayOf(it.measurement.apPosition.x, it.measurement.apPosition.y) }
+        measurements.map { doubleArrayOf(it.measurement.position.x, it.measurement.position.y) }
             .toTypedArray()
     val weights = computeMeasurementWeights(measurements)
 
@@ -165,11 +167,20 @@ private fun nonlinearLeastSquaresTrilateration(
     val sigmaY2 = covariances[1][1]
     val sigmaPos = sqrt(sigmaX2 + sigmaY2)
     val chiSquaredValue = getChiSquaredValue(confidenceLevel)
-    val accuracyRadius = sigmaPos * sqrt(chiSquaredValue)
+    val xyAccuracyRadius = sigmaPos * sqrt(chiSquaredValue)
+
+    // TODO: calculate z and zAccuracyRadius by taking it into account for trilateration
+    val z = measurements.mapNotNull { it.measurement.position.z }.let {
+        if (it.isNotEmpty()) it.average() else null
+    }
+    val zAccuracyRadius = measurements.mapNotNull { it.measurement.zPositionVariance }.let {
+        if (it.isNotEmpty()) it.average() else null
+    }
 
     return TrilaterationResult(
-        estimatedPosition = Point(x, y),
-        accuracyRadius = accuracyRadius
+        estimatedPosition = Point(x, y, z),
+        xyAccuracyRadius = xyAccuracyRadius,
+        zAccuracyRadius = zAccuracyRadius
     )
 }
 
@@ -234,7 +245,7 @@ private fun ransacTrilateration(
         val sample = combination.map { measurements[it] }
 
         // use geometric median of sample positions as initial guess
-        val initialGuess = geometricMedian(sample.map { it.measurement.apPosition })
+        val initialGuess = geometricMedian(sample.map { it.measurement.position })
 
         // estimate position using the sample
         val result =
@@ -244,8 +255,8 @@ private fun ransacTrilateration(
 
         // determine inliers
         val inliers = measurements.filter { entry ->
-            val dx = estimatedPosition.x - entry.measurement.apPosition.x
-            val dy = estimatedPosition.y - entry.measurement.apPosition.y
+            val dx = estimatedPosition.x - entry.measurement.position.x
+            val dy = estimatedPosition.y - entry.measurement.position.y
             val estimatedDistance = sqrt((dx * dx) + (dy * dy))
             val measuredDistance = rssiToDistance(entry.measurement.rssi, entry.pathLossExponent)
             val residual = abs(estimatedDistance - measuredDistance)
@@ -281,8 +292,9 @@ private fun ransacTrilateration(
 }
 
 data class EstimatedPosition(
-    val estimatedPosition: Point,
-    val accuracyRadius: Double
+    val position: Point,
+    val xzAccuracyRadius: Double,
+    val zAccuracyRadius: Double?
 )
 
 /**
@@ -303,10 +315,11 @@ fun estimatePosition(
             // as we can't assess the result
             val pathLossExponent = 3.0
 
-            val accuracyRadius =
+            val xzAccuracyRadius =
                 sqrt(totalMeasurementVariance(measurement, pathLossExponent)
                             * getChiSquaredValue(confidenceLevel))
-            return EstimatedPosition(measurement.apPosition, accuracyRadius)
+            val zAccuracyRadius = measurement.zPositionVariance
+            return EstimatedPosition(measurement.position, xzAccuracyRadius, zAccuracyRadius)
         }
         else -> {
             val results: List<RansacTrilaterationResult?> = runBlocking(Dispatchers.Default) {
@@ -331,13 +344,16 @@ fun estimatePosition(
                     best == null || item.inliersSize > best.inliersSize -> item
                     item.inliersSize < best.inliersSize -> best
                     // item.inliersSize == best.inliersSize
-                    item.trilaterationResult.accuracyRadius < best.trilaterationResult.accuracyRadius -> item
+                    item.trilaterationResult.xyAccuracyRadius < best.trilaterationResult.xyAccuracyRadius &&
+                            (item.trilaterationResult.zAccuracyRadius
+                                ?: Double.MAX_VALUE) <= (best.trilaterationResult.zAccuracyRadius
+                        ?: Double.MAX_VALUE) -> item
                     else -> best
                 }
             }
 
             return bestResult?.trilaterationResult?.let {
-                EstimatedPosition(it.estimatedPosition, it.accuracyRadius)
+                EstimatedPosition(it.estimatedPosition, it.xyAccuracyRadius, it.zAccuracyRadius)
             }
         }
     }
@@ -353,38 +369,51 @@ private fun geometricMedian(
 ): Point {
     var x = points[0].x
     var y = points[0].y
+    var z = points[0].z
 
     for (iteration in 1..maxIterations) {
         var numX = 0.0
         var numY = 0.0
+        var numZ = 0.0
         var den = 0.0
         var maxShift = 0.0
 
         for (point in points) {
-            val dx = x - point.x
-            val dy = y - point.y
-            val dist = sqrt((dx * dx) + (dy * dy))
+            val px = point.x
+            val py = point.y
+            val pz = point.z
+
+            val dx = x - px
+            val dy = y - py
+            val dz = if (pz != null && z != null) z - pz else 0.0
+            val dist = sqrt((dx * dx) + (dy * dy) + (dz * dz))
             val weight = 1.0 / max(dist, tolerance)
 
-            numX += point.x * weight
-            numY += point.y * weight
+            numX += px * weight
+            numY += py * weight
+            numZ += pz?.times(weight) ?: 0.0
             den += weight
             maxShift = max(maxShift, dist)
         }
 
         val xNew = numX / den
         val yNew = numY / den
+        val zNew = numZ / den
 
-        val shift = sqrt(((x - xNew) * (x - xNew)) + ((y - yNew) * (y - yNew)))
+        val shift = sqrt(
+            ((x - xNew) * (x - xNew)) + ((y - yNew) * (y - yNew)) + (((z ?: 0.0) - zNew) * ((z
+                ?: 0.0) - zNew))
+        )
         x = xNew
         y = yNew
+        z = zNew
 
         if (shift < tolerance) {
             break
         }
     }
 
-    return Point(x, y)
+    return Point(x, y, z)
 }
 
 /**
@@ -404,8 +433,9 @@ fun geoPointToEnuPoint(geoPoint: GeoPoint, refGeoPoint: GeoPoint): Point {
 
     val x = EARTH_RADIUS * dLon * cos(latRad)
     val y = EARTH_RADIUS * dLat
+    val z = geoPoint.altitude
 
-    return Point(x, y)
+    return Point(x, y, z)
 }
 
 fun enuPointToGeoPoint(enuPoint: Point, refGeoPoint: GeoPoint): GeoPoint {
@@ -415,6 +445,7 @@ fun enuPointToGeoPoint(enuPoint: Point, refGeoPoint: GeoPoint): GeoPoint {
 
     val lat = refGeoPoint.latitude + Math.toDegrees(dLat)
     val lon = refGeoPoint.longitude + Math.toDegrees(dLon)
+    val alt = enuPoint.z
 
-    return GeoPoint(lat, lon)
+    return GeoPoint(lat, lon, alt)
 }

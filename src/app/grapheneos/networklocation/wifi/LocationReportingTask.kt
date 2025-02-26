@@ -104,19 +104,27 @@ class LocationReportingTask(private val provider: LocationProviderBase,
         // or less of them being in a wildly incorrect location
         val refGeoPoint = GeoPoint(
             bestResults.map { it.positioningData.latitude }.median(),
-            bestResults.map { it.positioningData.longitude }.median()
+            bestResults.map { it.positioningData.longitude }.median(),
+            bestResults.mapNotNull { it.positioningData.altitudeMeters }.let {
+                if (it.isNotEmpty()) it.average() else null
+            }
         )
 
-        val measurements = bestResults.map {
-            val positioningData = it.positioningData
+        val measurements = bestResults.map { result ->
+            val positioningData = result.positioningData
             // convert position to Cartesian coordinates
-            val apPosition = geoPointToEnuPoint(
-                GeoPoint(positioningData.latitude, positioningData.longitude),
+            val position = geoPointToEnuPoint(
+                GeoPoint(
+                    positioningData.latitude,
+                    positioningData.longitude,
+                    positioningData.altitudeMeters?.toDouble()
+                ),
                 refGeoPoint
             )
-            val apAccuracyVariance = positioningData.accuracyMeters.toDouble().pow(2)
-            val rssi = it.scanResult.level.toDouble()
-            Measurement(apPosition, apAccuracyVariance, rssi)
+            val xyPositionVariance = positioningData.accuracyMeters.toDouble().pow(2)
+            val zPositionVariance = positioningData.verticalAccuracyMeters?.toDouble()
+            val rssi = result.scanResult.level.toDouble()
+            Measurement(position, xyPositionVariance, zPositionVariance, rssi)
         }
 
         val time = SystemClock.elapsedRealtime()
@@ -134,12 +142,13 @@ class LocationReportingTask(private val provider: LocationProviderBase,
         val locationAgeMillis = SystemClock.elapsedRealtime() - loc.elapsedRealtimeNanos / 1_000_000L
         loc.time = max(0L, System.currentTimeMillis() - locationAgeMillis)
 
-        val enuPoint = Point(result.estimatedPosition.x, result.estimatedPosition.y)
+        val enuPoint = Point(result.position.x, result.position.y, result.position.z)
         val estimatedGeoPoint = enuPointToGeoPoint(enuPoint, refGeoPoint)
         loc.longitude = estimatedGeoPoint.longitude
         loc.latitude = estimatedGeoPoint.latitude
-        loc.accuracy = result.accuracyRadius.toFloat()
-        // TODO: estimate altitude
+        loc.accuracy = result.xzAccuracyRadius.toFloat()
+        result.position.z?.let { loc.altitude = it }
+        result.zAccuracyRadius?.let { loc.verticalAccuracyMeters = it.toFloat() }
         return loc
     }
 }
