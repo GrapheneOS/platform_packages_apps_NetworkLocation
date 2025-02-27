@@ -122,7 +122,7 @@ class LocationReportingTask(private val provider: LocationProviderBase,
                 refGeoPoint
             )
             val xyPositionVariance = positioningData.accuracyMeters.toDouble().pow(2)
-            val zPositionVariance = positioningData.verticalAccuracyMeters?.toDouble()
+            val zPositionVariance = positioningData.verticalAccuracyMeters?.toDouble()?.pow(2)
             val rssi = result.scanResult.level.toDouble()
             Measurement(position, xyPositionVariance, zPositionVariance, rssi)
         }
@@ -147,7 +147,7 @@ class LocationReportingTask(private val provider: LocationProviderBase,
         loc.longitude = estimatedGeoPoint.longitude
         loc.latitude = estimatedGeoPoint.latitude
         loc.accuracy = result.xzAccuracyRadius.toFloat()
-        result.position.z?.let { loc.altitude = it }
+        estimatedGeoPoint.altitude?.let { loc.altitude = it }
         result.zAccuracyRadius?.let { loc.verticalAccuracyMeters = it.toFloat() }
         return loc
     }

@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
+import org.apache.commons.math3.distribution.ChiSquaredDistribution
 import org.apache.commons.math3.exception.ConvergenceException
 import org.apache.commons.math3.exception.TooManyEvaluationsException
 import org.apache.commons.math3.exception.TooManyIterationsException
@@ -49,7 +50,7 @@ data class Measurement(
 private class MeasurementExt(val measurement: Measurement, val pathLossExponent: Double)
 
 private data class TrilaterationResult(
-    val estimatedPosition: Point,
+    val position: Point,
     val xyAccuracyRadius: Double, // confidence radius (in meters)
     val zAccuracyRadius: Double? // confidence radius (in meters)
 )
@@ -71,16 +72,22 @@ private fun rssiVarianceToDistanceVariance(rssi: Double, pathLossExponent: Doubl
     return factor * factor * RSSI_VARIANCE
 }
 
-private fun totalMeasurementVariance(measurement: Measurement, pathLossExponent: Double): Double {
+private fun totalMeasurementVariance(
+    measurement: Measurement,
+    pathLossExponent: Double,
+    computeZ: Boolean
+): Double {
     val distanceVariance = rssiVarianceToDistanceVariance(measurement.rssi, pathLossExponent)
-    return distanceVariance + measurement.xyPositionVariance
+    return distanceVariance + (measurement.xyPositionVariance + if (computeZ) measurement.zPositionVariance
+        ?: 0.0 else 0.0)
 }
 
 private fun computeMeasurementWeights(
-    measurements: List<MeasurementExt>
+    measurements: List<MeasurementExt>,
+    computeZ: Boolean
 ): DoubleArray {
     return measurements.map { entry ->
-        val variance = totalMeasurementVariance(entry.measurement, entry.pathLossExponent)
+        val variance = totalMeasurementVariance(entry.measurement, entry.pathLossExponent, computeZ)
         1.0 / variance
     }.toDoubleArray()
 }
@@ -96,12 +103,12 @@ fun List<Double>.median(): Double {
 }
 
 /**
- * Computes the chi-squared value for two degrees of freedom.
+ * Computes the chi-squared value for the specified degrees of freedom.
  */
-private fun getChiSquaredValue(confidenceLevel: Double): Double {
+private fun getChiSquaredValue(confidenceLevel: Double, degreesOfFreedom: Double): Double {
     require(confidenceLevel > 0.0 && confidenceLevel < 1.0) { "Confidence level must be between 0 and 1 (exclusive)." }
 
-    return -2.0 * ln(1.0 - confidenceLevel)
+    return ChiSquaredDistribution(degreesOfFreedom).inverseCumulativeProbability(confidenceLevel)
 }
 
 private fun nonlinearLeastSquaresTrilateration(
@@ -116,10 +123,28 @@ private fun nonlinearLeastSquaresTrilateration(
 
     val observedDistances =
         measurements.map { rssiToDistance(it.measurement.rssi, it.pathLossExponent) }.toDoubleArray()
+    var computeZ = true
     val positions =
-        measurements.map { doubleArrayOf(it.measurement.position.x, it.measurement.position.y) }
-            .toTypedArray()
-    val weights = computeMeasurementWeights(measurements)
+        measurements.map {
+            val position = it.measurement.position
+            if (position.z != null) {
+                doubleArrayOf(
+                    position.x,
+                    position.y,
+                    position.z
+                )
+            } else {
+                // don't compute z if any of our measurements don't have z
+                computeZ = false
+                doubleArrayOf(
+                    position.x,
+                    position.y
+                )
+            }
+        }.map {
+            if (computeZ) doubleArrayOf(it[0], it[1], it[2]) else doubleArrayOf(it[0], it[1])
+        }.toTypedArray()
+    val weights = computeMeasurementWeights(measurements, computeZ)
 
     // create weight matrix from weights array
     val weightMatrix = Array2DRowRealMatrix(weights.size, weights.size)
@@ -127,9 +152,13 @@ private fun nonlinearLeastSquaresTrilateration(
         weightMatrix.setEntry(i, i, weights[i])
     }
 
-    val model = TrilaterationFunction(positions)
+    val model = TrilaterationFunction(positions, computeZ)
 
-    val initialPoint = doubleArrayOf(initialGuess.x, initialGuess.y)
+    val initialPoint = if (computeZ) {
+        doubleArrayOf(initialGuess.x, initialGuess.y, initialGuess.z!!)
+    } else {
+        doubleArrayOf(initialGuess.x, initialGuess.y)
+    }
 
     val optimizer = LevenbergMarquardtOptimizer()
 
@@ -156,6 +185,7 @@ private fun nonlinearLeastSquaresTrilateration(
     val estimatedParameters = optimum.point.toArray()
     val x = estimatedParameters[0]
     val y = estimatedParameters[1]
+    val z = if (computeZ) estimatedParameters[2] else null
 
     // estimate accuracy radius (confidence interval)
     val covariances = try {
@@ -165,20 +195,14 @@ private fun nonlinearLeastSquaresTrilateration(
     }
     val sigmaX2 = covariances[0][0]
     val sigmaY2 = covariances[1][1]
-    val sigmaPos = sqrt(sigmaX2 + sigmaY2)
-    val chiSquaredValue = getChiSquaredValue(confidenceLevel)
-    val xyAccuracyRadius = sigmaPos * sqrt(chiSquaredValue)
-
-    // TODO: calculate z and zAccuracyRadius by taking it into account for trilateration
-    val z = measurements.mapNotNull { it.measurement.position.z }.let {
-        if (it.isNotEmpty()) it.average() else null
-    }
-    val zAccuracyRadius = measurements.mapNotNull { it.measurement.zPositionVariance }.let {
-        if (it.isNotEmpty()) it.average() else null
-    }
+    val sigmaZ2 = if (computeZ) covariances[2][2] else null
+    val sigmaXy = sqrt(sigmaX2 + sigmaY2)
+    val sigmaZ = sigmaZ2?.let { sqrt(it) }
+    val xyAccuracyRadius = sigmaXy * sqrt(getChiSquaredValue(confidenceLevel, 2.0))
+    val zAccuracyRadius = sigmaZ?.times(sqrt(getChiSquaredValue(confidenceLevel, 1.0)))
 
     return TrilaterationResult(
-        estimatedPosition = Point(x, y, z),
+        position = Point(x, y, z),
         xyAccuracyRadius = xyAccuracyRadius,
         zAccuracyRadius = zAccuracyRadius
     )
@@ -188,24 +212,29 @@ private fun nonlinearLeastSquaresTrilateration(
  * Trilateration function for Apache Commons Math.
  */
 private class TrilaterationFunction(
-    private val positions: Array<DoubleArray>
+    private val positions: Array<DoubleArray>,
+    private val computeZ: Boolean
 ) : MultivariateJacobianFunction {
     override fun value(point: RealVector): org.apache.commons.math3.util.Pair<RealVector, org.apache.commons.math3.linear.RealMatrix> {
         val x = point.toArray()
         val numMeasurements = positions.size
 
         val values = DoubleArray(numMeasurements)
-        val jacobian = Array(numMeasurements) { DoubleArray(2) }
+        val jacobian = Array(numMeasurements) { DoubleArray(if (computeZ) 3 else 2) }
 
         for (i in 0 until numMeasurements) {
             val dx = x[0] - positions[i][0]
             val dy = x[1] - positions[i][1]
-            val distance = sqrt((dx * dx) + (dy * dy)) + 1e-12 // avoid division by zero
+            val dz = if (computeZ) x[2] - positions[i][2] else null
+            val distance = sqrt(
+                (dx * dx) + (dy * dy) + (dz?.times(dz) ?: 0.0)
+            ) + 1e-12 // avoid division by zero
 
             values[i] = distance
 
             jacobian[i][0] = dx / distance
             jacobian[i][1] = dy / distance
+            dz?.let { jacobian[i][2] = it / distance }
         }
 
         val valueVector = ArrayRealVector(values)
@@ -244,6 +273,9 @@ private fun ransacTrilateration(
     for (combination in Combinations(numMeasurements, sampleSize)) {
         val sample = combination.map { measurements[it] }
 
+        val computeZ =
+            !sample.any { it.measurement.position.z == null || it.measurement.zPositionVariance == null }
+
         // use geometric median of sample positions as initial guess
         val initialGuess = geometricMedian(sample.map { it.measurement.position })
 
@@ -251,16 +283,19 @@ private fun ransacTrilateration(
         val result =
             nonlinearLeastSquaresTrilateration(sample, initialGuess) ?: continue
 
-        val estimatedPosition = result.estimatedPosition
+        val estimatedPosition = result.position
 
         // determine inliers
         val inliers = measurements.filter { entry ->
             val dx = estimatedPosition.x - entry.measurement.position.x
             val dy = estimatedPosition.y - entry.measurement.position.y
-            val estimatedDistance = sqrt((dx * dx) + (dy * dy))
+            val dz = if (computeZ) entry.measurement.position.z?.let { estimatedPosition.z!! - it }
+                ?: 0.0 else 0.0
+            val estimatedDistance = sqrt((dx * dx) + (dy * dy) + (dz * dz))
             val measuredDistance = rssiToDistance(entry.measurement.rssi, entry.pathLossExponent)
             val residual = abs(estimatedDistance - measuredDistance)
-            val variance = totalMeasurementVariance(entry.measurement, entry.pathLossExponent)
+            val variance =
+                totalMeasurementVariance(entry.measurement, entry.pathLossExponent, computeZ)
             val standardizedResidual = residual / sqrt(variance)
 
             val threshold = 2.0 // within 2 standard deviations
@@ -282,7 +317,7 @@ private fun ransacTrilateration(
         // refine position by using all inliers, and the best result as the initial guess
         return nonlinearLeastSquaresTrilateration(
             bestInliers,
-            bestResult.estimatedPosition,
+            bestResult.position,
             confidenceLevel = confidenceLevel
         )?.let {
             RansacTrilaterationResult(it, bestInliers.size)
@@ -315,9 +350,12 @@ fun estimatePosition(
             // as we can't assess the result
             val pathLossExponent = 3.0
 
-            val xzAccuracyRadius =
-                sqrt(totalMeasurementVariance(measurement, pathLossExponent)
-                            * getChiSquaredValue(confidenceLevel))
+            val xzAccuracyRadius = sqrt(
+                totalMeasurementVariance(measurement, pathLossExponent, false) * getChiSquaredValue(
+                    confidenceLevel,
+                    2.0
+                )
+            )
             val zAccuracyRadius = measurement.zPositionVariance
             return EstimatedPosition(measurement.position, xzAccuracyRadius, zAccuracyRadius)
         }
@@ -344,16 +382,15 @@ fun estimatePosition(
                     best == null || item.inliersSize > best.inliersSize -> item
                     item.inliersSize < best.inliersSize -> best
                     // item.inliersSize == best.inliersSize
-                    item.trilaterationResult.xyAccuracyRadius < best.trilaterationResult.xyAccuracyRadius &&
-                            (item.trilaterationResult.zAccuracyRadius
-                                ?: Double.MAX_VALUE) <= (best.trilaterationResult.zAccuracyRadius
+                    item.trilaterationResult.xyAccuracyRadius < best.trilaterationResult.xyAccuracyRadius && (item.trilaterationResult.zAccuracyRadius
+                        ?: Double.MAX_VALUE) <= (best.trilaterationResult.zAccuracyRadius
                         ?: Double.MAX_VALUE) -> item
                     else -> best
                 }
             }
 
             return bestResult?.trilaterationResult?.let {
-                EstimatedPosition(it.estimatedPosition, it.xyAccuracyRadius, it.zAccuracyRadius)
+                EstimatedPosition(it.position, it.xyAccuracyRadius, it.zAccuracyRadius)
             }
         }
     }
@@ -433,7 +470,7 @@ fun geoPointToEnuPoint(geoPoint: GeoPoint, refGeoPoint: GeoPoint): Point {
 
     val x = EARTH_RADIUS * dLon * cos(latRad)
     val y = EARTH_RADIUS * dLat
-    val z = geoPoint.altitude
+    val z = refGeoPoint.altitude?.let { geoPoint.altitude?.minus(it) }
 
     return Point(x, y, z)
 }
@@ -445,7 +482,7 @@ fun enuPointToGeoPoint(enuPoint: Point, refGeoPoint: GeoPoint): GeoPoint {
 
     val lat = refGeoPoint.latitude + Math.toDegrees(dLat)
     val lon = refGeoPoint.longitude + Math.toDegrees(dLon)
-    val alt = enuPoint.z
+    val alt = enuPoint.z?.let { refGeoPoint.altitude?.plus(it) }
 
     return GeoPoint(lat, lon, alt)
 }
