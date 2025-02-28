@@ -21,6 +21,7 @@ android_app {
 
     required: [
         "permissions_app.grapheneos.networklocation.xml",
+        "sysconfig_app.grapheneos.networklocation.xml",
     ],
 }
 
@@ -29,5 +30,13 @@ prebuilt_etc {
     name: "permissions_app.grapheneos.networklocation.xml",
     src: "permissions/app.grapheneos.networklocation.xml",
     sub_dir: "permissions",
+    system_ext_specific: true,
+}
+
+prebuilt_etc {
+    filename_from_src: true,
+    name: "sysconfig_app.grapheneos.networklocation.xml",
+    src: "sysconfig/app.grapheneos.networklocation.xml",
+    sub_dir: "sysconfig",
     system_ext_specific: true,
 }
