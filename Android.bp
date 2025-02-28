@@ -20,13 +20,14 @@ android_app {
     ],
 
     required: [
-        "privapp_whitelist_app.grapheneos.networklocation.xml",
+        "permissions_app.grapheneos.networklocation.xml",
     ],
 }
 
 prebuilt_etc {
-    name: "privapp_whitelist_app.grapheneos.networklocation.xml",
-    src: "privapp_whitelist_app.grapheneos.networklocation.xml",
+    filename_from_src: true,
+    name: "permissions_app.grapheneos.networklocation.xml",
+    src: "permissions/app.grapheneos.networklocation.xml",
     sub_dir: "permissions",
     system_ext_specific: true,
 }
