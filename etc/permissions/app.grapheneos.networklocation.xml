@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<permissions>
-    <privapp-permissions package="app.grapheneos.networklocation">
-        <permission name="android.permission.INSTALL_LOCATION_PROVIDER" />
-        <permission name="android.permission.LOCATION_HARDWARE" />
-        <permission name="android.permission.UPDATE_DEVICE_STATS" />
-    </privapp-permissions>
-</permissions>

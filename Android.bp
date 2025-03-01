@@ -20,17 +20,8 @@ android_app {
     ],
 
     required: [
-        "etc_permissions_app.grapheneos.networklocation.xml",
         "etc_sysconfig_app.grapheneos.networklocation.xml",
     ],
-}
-
-prebuilt_etc {
-    name: "etc_permissions_app.grapheneos.networklocation.xml",
-    src: "etc/permissions/app.grapheneos.networklocation.xml",
-    sub_dir: "permissions",
-    filename_from_src: true,
-    system_ext_specific: true,
 }
 
 prebuilt_etc {
