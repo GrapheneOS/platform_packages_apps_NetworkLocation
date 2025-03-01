@@ -40,6 +40,7 @@ class WifiApScanner(private val context: Context) {
             // type is WifiScanner.SCAN_TYPE_LOW_LATENCY by default
             band = WifiScanner.WIFI_BAND_BOTH
             rnrSetting = WifiScanner.WIFI_RNR_NOT_NEEDED
+            hideFromAppOps = true
         }
 
         return suspendCancellableCoroutine { continuation ->
