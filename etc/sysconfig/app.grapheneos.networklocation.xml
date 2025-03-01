@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <config>
+    <allow-in-data-usage-save package="app.grapheneos.networklocation" />
     <allow-in-power-save package="app.grapheneos.networklocation" />
 
     <privapp-permissions package="app.grapheneos.networklocation">
