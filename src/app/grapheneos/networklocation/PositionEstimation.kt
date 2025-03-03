@@ -113,7 +113,8 @@ private fun nonlinearLeastSquaresTrilateration(
     measurements: List<MeasurementExt>,
     initialGuess: Point,
     maxIterations: Int = 1000,
-    confidenceLevel: Double = 0.95
+    confidenceLevel: Double = 0.95,
+    trilaterateWithZ: Boolean,
 ): TrilaterationResult? {
     if (measurements.size < 2) {
         return null // not enough measurements
@@ -121,7 +122,7 @@ private fun nonlinearLeastSquaresTrilateration(
 
     val observedDistances =
         measurements.map { rssiToDistance(it.measurement.rssi, it.pathLossExponent) }.toDoubleArray()
-    var trilaterateWithZ = true
+    var canTrilaterateWithZ = trilaterateWithZ
     val positions =
         measurements.map {
             val position = it.measurement.position
@@ -132,8 +133,8 @@ private fun nonlinearLeastSquaresTrilateration(
                     position.z
                 )
             } else {
-                // don't trilaterate with Z if any of our measurements don't have Z
-                trilaterateWithZ = false
+                // can't trilaterate with Z if any of our measurements don't have Z
+                canTrilaterateWithZ = false
                 doubleArrayOf(
                     position.x,
                     position.y
@@ -159,9 +160,9 @@ private fun nonlinearLeastSquaresTrilateration(
         weightMatrix.setEntry(i, i, weights[i])
     }
 
-    val model = TrilaterationFunction(positions, trilaterateWithZ)
+    val model = TrilaterationFunction(positions, canTrilaterateWithZ)
 
-    val initialPoint = if (trilaterateWithZ) {
+    val initialPoint = if (canTrilaterateWithZ) {
         doubleArrayOf(initialGuess.x, initialGuess.y, initialGuess.z ?: fallbackZ!!)
     } else {
         doubleArrayOf(initialGuess.x, initialGuess.y)
@@ -192,7 +193,7 @@ private fun nonlinearLeastSquaresTrilateration(
     val estimatedParameters = optimum.point.toArray()
     val x = estimatedParameters[0]
     val y = estimatedParameters[1]
-    val z = if (trilaterateWithZ) estimatedParameters[2] else fallbackZ
+    val z = if (canTrilaterateWithZ) estimatedParameters[2] else fallbackZ
 
     // estimate accuracy radius (confidence interval)
     val covariances = try {
@@ -202,7 +203,7 @@ private fun nonlinearLeastSquaresTrilateration(
     }
     val sigmaX2 = covariances[0][0]
     val sigmaY2 = covariances[1][1]
-    val sigmaZ2 = if (trilaterateWithZ) covariances[2][2] else fallbackSigmaZ2
+    val sigmaZ2 = if (canTrilaterateWithZ) covariances[2][2] else fallbackSigmaZ2
     val sigmaXy = sqrt(sigmaX2 + sigmaY2)
     val sigmaZ = sigmaZ2?.let { sqrt(it) }
     val xyAccuracyRadius = sigmaXy * sqrt(getChiSquaredValue(confidenceLevel, 2.0))
@@ -266,7 +267,8 @@ const val MAX_MEASUREMENTS_FOR_RANSAC_TRILATERATION = 9
 private fun ransacTrilateration(
     measurements: List<MeasurementExt>,
     minInliers: Int = 3,
-    confidenceLevel: Double = 0.95
+    confidenceLevel: Double = 0.95,
+    trilaterateWithZ: Boolean,
 ): RansacTrilaterationResult? {
     val numMeasurements = measurements.size
     require(numMeasurements <= MAX_MEASUREMENTS_FOR_RANSAC_TRILATERATION)
@@ -285,7 +287,11 @@ private fun ransacTrilateration(
 
         // estimate position using the sample
         val result =
-            nonlinearLeastSquaresTrilateration(sample, initialGuess) ?: continue
+            nonlinearLeastSquaresTrilateration(
+                sample,
+                initialGuess,
+                trilaterateWithZ = trilaterateWithZ
+            ) ?: continue
 
         val estimatedPosition = result.position
 
@@ -293,9 +299,12 @@ private fun ransacTrilateration(
         val inliers = measurements.filter { entry ->
             val dx = estimatedPosition.x - entry.measurement.position.x
             val dy = estimatedPosition.y - entry.measurement.position.y
-            val dz =
+            val dz = if (trilaterateWithZ) {
                 estimatedPosition.z?.let { entry.measurement.position.z?.let { estimatedPosition.z - it } }
                     ?: 0.0
+            } else {
+                0.0
+            }
             val estimatedDistance = sqrt((dx * dx) + (dy * dy) + (dz * dz))
             val measuredDistance = rssiToDistance(entry.measurement.rssi, entry.pathLossExponent)
             val residual = abs(estimatedDistance - measuredDistance)
@@ -322,7 +331,8 @@ private fun ransacTrilateration(
         return nonlinearLeastSquaresTrilateration(
             bestInliers,
             bestResult.position,
-            confidenceLevel = confidenceLevel
+            confidenceLevel = confidenceLevel,
+            trilaterateWithZ = trilaterateWithZ,
         )?.let {
             RansacTrilaterationResult(it, bestInliers.size)
         }
@@ -380,6 +390,8 @@ fun estimatePosition(
                                 .take(MAX_MEASUREMENTS_FOR_RANSAC_TRILATERATION),
                             minInliers = if (measurements.size == 2) 2 else 3,
                             confidenceLevel = confidenceLevel,
+                            // TODO: re-enable once it's optimized enough
+                            trilaterateWithZ = false
                         )
                     }
                     tasks.add(result)
