@@ -9,9 +9,9 @@ import android.os.WorkSource
 import android.util.Log
 import android.util.SparseArray
 import app.grapheneos.networklocation.verboseLog
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 private const val TAG = "WifiApScanner"
 
