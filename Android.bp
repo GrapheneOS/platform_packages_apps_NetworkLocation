@@ -11,12 +11,16 @@ android_app {
 
     static_libs: [
         "androidx.core_core",
+        "network-location-position-estimation",
         "network-location-proto",
-        "apache-commons-math3",
     ],
 
     libs: [
         "com.android.location.provider.impl",
+    ],
+
+    jni_libs: [
+        "libnetwork_location_position_estimation_rust",
     ],
 
     required: [
