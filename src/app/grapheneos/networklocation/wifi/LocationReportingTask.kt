@@ -7,42 +7,48 @@ import android.location.provider.ProviderRequest
 import android.net.wifi.ScanResult
 import android.os.SystemClock
 import android.util.Log
-import app.grapheneos.networklocation.EstimatedPosition
 import app.grapheneos.networklocation.GeoPoint
-import app.grapheneos.networklocation.MAX_MEASUREMENTS_FOR_RANSAC_TRILATERATION
-import app.grapheneos.networklocation.Measurement
 import app.grapheneos.networklocation.Point
 import app.grapheneos.networklocation.enuPointToGeoPoint
-import app.grapheneos.networklocation.estimatePosition
 import app.grapheneos.networklocation.geoPointToEnuPoint
+import app.grapheneos.networklocation.interop.position_estimation.Coordinate
+import app.grapheneos.networklocation.interop.position_estimation.Measurement
+import app.grapheneos.networklocation.interop.position_estimation.Position
+import app.grapheneos.networklocation.interop.position_estimation.PositionEstimation
 import app.grapheneos.networklocation.median
+import app.grapheneos.networklocation.rssiToDistance
 import app.grapheneos.networklocation.verboseLog
-import kotlinx.coroutines.delay
 import java.io.IOException
+import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.pow
+import kotlin.math.sqrt
 import kotlin.time.Duration.Companion.microseconds
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 
 private const val TAG = "LocationReportingTask"
 
-class LocationReportingTask(private val provider: LocationProviderBase,
-                            private val request: ProviderRequest,
-                            private val scanner: WifiApScanner,
-                            private val service: WifiPositioningServiceCache,
+class LocationReportingTask(
+    private val provider: LocationProviderBase,
+    private val request: ProviderRequest,
+    private val scanner: WifiApScanner,
+    private val ranger: WifiApRanger,
+    private val service: WifiPositioningServiceCache,
 ) {
     suspend fun run() {
         val interval = max(1000, request.intervalMillis)
-        verboseLog(TAG) {"started, interval: $interval ms"}
+        verboseLog(TAG) { "started, interval: $interval ms" }
         while (true) {
             val start = SystemClock.elapsedRealtime()
             step()
             val stepDuration = SystemClock.elapsedRealtime() - start
             if (stepDuration < interval) {
                 val sleepDuration = interval - stepDuration
-                verboseLog(TAG) {"sleeping for $sleepDuration ms"}
+                verboseLog(TAG) { "sleeping for $sleepDuration ms" }
                 delay(sleepDuration)
             } else {
-                verboseLog(TAG) {"step took longer than interval ($interval ms): $stepDuration ms"}
+                verboseLog(TAG) { "step took longer than interval ($interval ms): $stepDuration ms" }
             }
         }
     }
@@ -57,11 +63,12 @@ class LocationReportingTask(private val provider: LocationProviderBase,
                     Log.d(TAG, e.toString())
                     return
                 }
+
                 else -> throw e
             }
         }
         val location = estimateLocation(scanResults)
-        verboseLog(TAG) {"estimateLocation returned $location"}
+        verboseLog(TAG) { "estimateLocation returned $location" }
         if (location != null) {
             provider.reportLocation(location)
         }
@@ -69,11 +76,13 @@ class LocationReportingTask(private val provider: LocationProviderBase,
 
     private class PositionedScanResult(
         val scanResult: ScanResult,
-        val positioningData: PositioningData,
+        val positioningData: PositioningData?,
+        var estimatedDistance: Double?,
     )
 
     private fun estimateLocation(scanResults: List<ScanResult>): Location? {
-        val bestResults = mutableListOf<PositionedScanResult>()
+        var bestResults = HashMap<Bssid, PositionedScanResult>()
+
         for (scanResult in scanResults.sortedByDescending { it.level }) {
             val bssid: Bssid = scanResult.BSSID
 
@@ -91,11 +100,51 @@ class LocationReportingTask(private val provider: LocationProviderBase,
             if (positioningData == null) {
                 continue
             }
-            bestResults.add(PositionedScanResult(scanResult, positioningData))
-            if (bestResults.size == MAX_MEASUREMENTS_FOR_RANSAC_TRILATERATION) {
-                break
-            }
+            bestResults[bssid] =
+                PositionedScanResult(scanResult, positioningData, null)
         }
+        if (bestResults.isEmpty()) {
+            return null
+        }
+
+        runBlocking {
+            // TODO: use Wi-Fi RTT to estimate distance with RSSI as a fallback
+//            try {
+//                // TODO: maybe handle the fact that the max results this can return is 10
+//                ranger.range(bestResults.values.map { it.scanResult }, request.workSource)
+//                    .map { rangingResult ->
+//                        // TODO: handle one-sided RTT correctly
+//                        // use absolute value to counter negative distance values in cases of
+//                        // close devices
+//                        val distanceMeters = rangingResult.distanceMm.absoluteValue / 1000.0
+//
+//                        bestResults[rangingResult.macAddress.toString()]?.estimatedDistance =
+//                            distanceMeters
+//                    }
+//            } catch (e: Exception) {
+//                when (e) {
+//                    is WifiRangerUnavailableException, is WifiRangerFailedException -> {
+//                        // stack trace is intentionally omitted, it doesn't contain useful info
+//                        Log.d(TAG, e.toString())
+//                    }
+//
+//                    else -> throw e
+//                }
+//                verboseLog(TAG) { "falling back to RSSI for estimating distance" }
+                for (result in bestResults.values) {
+                    result.estimatedDistance = rssiToDistance(
+                        result.scanResult.level.toDouble(),
+                        3.0,
+                    )
+                }
+//            }
+        }
+
+        bestResults =
+            bestResults.filterValues {
+                it.positioningData != null && it.estimatedDistance != null
+            } as HashMap<Bssid, PositionedScanResult>
+
         if (bestResults.isEmpty()) {
             return null
         }
@@ -103,15 +152,15 @@ class LocationReportingTask(private val provider: LocationProviderBase,
         // use the median coordinates of nearby APs for protection against around 50%
         // or less of them being in a wildly incorrect location
         val refGeoPoint = GeoPoint(
-            bestResults.map { it.positioningData.latitude }.median(),
-            bestResults.map { it.positioningData.longitude }.median(),
-            bestResults.mapNotNull { it.positioningData.altitudeMeters }.let {
+            bestResults.values.map { it.positioningData!!.latitude }.median() ?: return null,
+            bestResults.values.map { it.positioningData!!.longitude }.median() ?: return null,
+            bestResults.values.mapNotNull { it.positioningData!!.altitudeMeters }.let {
                 if (it.isNotEmpty()) it.average() else null
             }
         )
 
-        val measurements = bestResults.map { result ->
-            val positioningData = result.positioningData
+        val measurements = bestResults.values.map { result ->
+            val positioningData = result.positioningData!!
             // convert position to Cartesian coordinates
             val position = geoPointToEnuPoint(
                 GeoPoint(
@@ -123,32 +172,53 @@ class LocationReportingTask(private val provider: LocationProviderBase,
             )
             val xyPositionVariance = positioningData.accuracyMeters.toDouble().pow(2)
             val zPositionVariance = positioningData.verticalAccuracyMeters?.toDouble()?.pow(2)
-            val rssi = result.scanResult.level.toDouble()
-            Measurement(position, xyPositionVariance, zPositionVariance, rssi)
+            Measurement(
+                Position(
+                    Coordinate(
+                        true,
+                        position.x,
+                        xyPositionVariance,
+                    ),
+                    Coordinate(
+                        true,
+                        position.y,
+                        xyPositionVariance,
+                    ),
+                    Coordinate(
+                        position.z != null,
+                        position.z ?: 0.0,
+                        zPositionVariance ?: 0.0,
+                    ),
+                ),
+                result.estimatedDistance!!,
+                0.0,
+            )
         }
 
         val time = SystemClock.elapsedRealtime()
-        val result: EstimatedPosition? = estimatePosition(measurements,
-            // accuracy should be at the 68th percentile confidence level
-            0.68)
-        verboseLog(TAG) {"estimateLocation took ${(SystemClock.elapsedRealtime() - time)} ms"}
+        val result = PositionEstimation.main(measurements.toTypedArray())
+        verboseLog(TAG) { "estimateLocation took ${(SystemClock.elapsedRealtime() - time)} ms" }
         if (result == null) {
             return null
         }
 
         val loc = Location(LocationManager.NETWORK_PROVIDER)
 
-        loc.elapsedRealtimeNanos = bestResults.minOf { it.scanResult.timestamp }.microseconds.inWholeNanoseconds
-        val locationAgeMillis = SystemClock.elapsedRealtime() - loc.elapsedRealtimeNanos / 1_000_000L
+        loc.elapsedRealtimeNanos =
+            bestResults.values.minOf { it.scanResult.timestamp }.microseconds.inWholeNanoseconds
+        val locationAgeMillis =
+            SystemClock.elapsedRealtime() - loc.elapsedRealtimeNanos / 1_000_000L
         loc.time = max(0L, System.currentTimeMillis() - locationAgeMillis)
 
-        val enuPoint = Point(result.position.x, result.position.y, result.position.z)
+        val enuPoint = Point(result.x.value, result.y.value, result.z.value)
         val estimatedGeoPoint = enuPointToGeoPoint(enuPoint, refGeoPoint)
         loc.longitude = estimatedGeoPoint.longitude
         loc.latitude = estimatedGeoPoint.latitude
-        loc.accuracy = result.xzAccuracyRadius.toFloat()
-        estimatedGeoPoint.altitude?.let { loc.altitude = it }
-        result.zAccuracyRadius?.let { loc.verticalAccuracyMeters = it.toFloat() }
+        loc.accuracy = ((sqrt(result.x.variance) + sqrt(result.y.variance)) / 2.0).toFloat()
+        estimatedGeoPoint.altitude?.let { estimatedAltitude ->
+            loc.altitude = estimatedAltitude
+            loc.verticalAccuracyMeters = sqrt(result.z.variance).toFloat()
+        }
         return loc
     }
 }

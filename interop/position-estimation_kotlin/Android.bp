@@ -1,0 +1,6 @@
+java_library {
+    name: "network-location-position-estimation",
+    sdk_version: "system_current",
+    min_sdk_version: "system_current",
+    srcs: ["src/**/*.kt"],
+}
