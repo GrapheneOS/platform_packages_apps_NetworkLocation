@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.util.Log
 import app.grapheneos.networklocation.wifi.AppleWifiPositioningService
 import app.grapheneos.networklocation.wifi.LocationReportingTask
+import app.grapheneos.networklocation.wifi.WifiApRanger
 import app.grapheneos.networklocation.wifi.WifiApScanner
 import app.grapheneos.networklocation.wifi.WifiPositioningServiceCache
 import kotlinx.coroutines.CoroutineScope
@@ -52,8 +53,13 @@ class LocationProviderImpl(private val context: Context)
                 return
             }
 
-            val task = LocationReportingTask(this, request, WifiApScanner(context),
-                wifiPositioningServiceCache)
+            val task = LocationReportingTask(
+                this,
+                request,
+                WifiApScanner(context),
+                WifiApRanger(context),
+                wifiPositioningServiceCache,
+            )
             locationReportingJob = CoroutineScope(Dispatchers.IO).launch {
                 task.run()
             }
