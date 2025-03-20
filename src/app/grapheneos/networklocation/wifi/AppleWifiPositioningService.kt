@@ -25,31 +25,48 @@ class AppleWifiPositioningService : WifiPositioningService {
     private val tlsSocketFactory = ModernTLSSocketFactory()
 
     @Throws(IOException::class)
-    override fun fetchNearbyApPositioningData(bssid: Bssid, maxResultsHint: Int): List<WifiApPositioningData> {
-        val response = fetchInner(bssid, maxResultsHint)
+    override fun fetchNearbyApPositioningData(
+        bssids: List<String>,
+        maxResultsHint: Int,
+        withPositioningDataThreshold: Int
+    ): List<WifiApPositioningData> {
+        val result = HashMap<Bssid, PositioningData?>()
 
-        val result = mutableListOf<WifiApPositioningData>()
+        // the service only allows up to 5 bssids per request
+        for (requestBssids in bssids.chunked(5)) {
+            val response = fetchInner(requestBssids, maxResultsHint)
 
-        for (ap in response.accessPointList) {
-            val apBssid = normalizeBssid(ap.bssid)
-            if (apBssid == null) {
-                Log.w(TAG, "invalid bssid ${ap.bssid}")
-                continue
+            for (ap in response.accessPointList) {
+                val apBssid = normalizeBssid(ap.bssid)
+                if (apBssid == null) {
+                    Log.w(TAG, "invalid bssid ${ap.bssid}")
+                    continue
+                }
+                result.putIfAbsent(apBssid, convertPositioningData(ap.positioningData))
             }
-            result.add(WifiApPositioningData(apBssid, convertPositioningData(ap.positioningData)))
+            for (bssid in requestBssids) {
+                if (!result.any { it.key == bssid }) {
+                    Log.d(
+                        TAG,
+                        "server didn't return positioning data for one of the requested bssids $bssid"
+                    )
+                    result.putIfAbsent(bssid, null)
+                }
+            }
+
+            if (bssids.count { result[it] != null } >= withPositioningDataThreshold) {
+                break
+            }
         }
-        if (!result.any { it.bssid == bssid }) {
-            Log.d(TAG, "server didn't return positioning data for the requested bssid $bssid")
-            result.add(0, WifiApPositioningData(bssid, positioningData = null))
-        }
-        return result
+
+        return result.map { WifiApPositioningData(it.key, it.value) }
     }
 
     @Throws(IOException::class)
-    private fun fetchInner(bssid: Bssid, maxResultsHint: Int): AppleWpsProtos.Response {
+    private fun fetchInner(bssids: List<Bssid>, maxResultsHint: Int): AppleWpsProtos.Response {
         val (url, enforceModernTls) = getServerUrl()
 
-        verboseLog(TAG) {"request bssid: $bssid"}
+        verboseLog(TAG) {"request bssids: $bssids"}
 
         val connection = url.openConnection() as HttpsURLConnection
         try {
@@ -75,9 +92,13 @@ class AppleWifiPositioningService : WifiPositioningService {
                 )
 
                 val body = AppleWpsProtos.Request.newBuilder().run {
-                    addBssidWrapper(AppleWpsProtos.BssidWrapper.newBuilder().setBssid(bssid).build())
+                    addAllBssidWrapper(bssids.map {
+                        AppleWpsProtos.BssidWrapper.newBuilder()
+                            .setBssid(it)
+                            .build()
+                    })
                     // should be at least 1, otherwise it defaults to around 400
-                    setMaxAdditionalResults(max(1, maxResultsHint - 1))
+                    setMaxAdditionalResults(max(1, maxResultsHint - bssids.size))
                     build()
                 }
 

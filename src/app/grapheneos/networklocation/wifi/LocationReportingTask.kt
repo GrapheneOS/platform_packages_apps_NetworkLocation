@@ -19,7 +19,6 @@ import app.grapheneos.networklocation.median
 import app.grapheneos.networklocation.rssiToDistance
 import app.grapheneos.networklocation.verboseLog
 import java.io.IOException
-import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -89,25 +88,33 @@ class LocationReportingTask(
     private fun estimateLocation(scanResults: List<ScanResult>): Location? {
         var bestResults = HashMap<Bssid, PositionedScanResult>()
 
-        for (scanResult in scanResults.sortedByDescending { it.level }) {
-            val bssid: Bssid = scanResult.BSSID
+        val positioningData = mutableListOf<WifiApPositioningData>()
 
-            val positioningData = try {
-                // don't make additional network request when there's at least 5 results already
-                val onlyCached = bestResults.size >= 5
-                service.getPositioningData(bssid, onlyCached)
-            } catch (e: IOException) {
-                Log.d(TAG, "unable to obtain positioning data: $e")
-                if (Log.isLoggable(TAG, Log.VERBOSE)) {
-                    Log.v(TAG, "", e)
-                }
-                continue
+        try {
+            val bssids = scanResults.sortedByDescending { it.level }.map { it.BSSID }
+
+            // just in case the potential additional requests fail, add only cached ones
+            positioningData.addAll(service.getPositioningData(bssids, 0))
+
+            // don't make additional requests when we have 15 of the closest results with valid
+            // positioning data already
+            val onlyCachedThreshold = 15
+            val result = service.getPositioningData(bssids, onlyCachedThreshold)
+            positioningData.clear()
+            positioningData.addAll(result)
+        } catch (e: IOException) {
+            Log.d(TAG, "unable to obtain positioning data: $e")
+            if (Log.isLoggable(TAG, Log.VERBOSE)) {
+                Log.v(TAG, "", e)
             }
-            if (positioningData == null) {
-                continue
+        }
+
+        for (data in positioningData) {
+            val scanResult = scanResults.find { it.BSSID == data.bssid }
+            if (scanResult != null && data.positioningData != null) {
+                bestResults[data.bssid] =
+                    PositionedScanResult(scanResult, data.positioningData, null)
             }
-            bestResults[bssid] =
-                PositionedScanResult(scanResult, positioningData, null)
         }
         if (bestResults.isEmpty()) {
             return null

@@ -32,20 +32,41 @@ class WifiPositioningServiceCache(private val service: WifiPositioningService) {
     }
 
     @Throws(IOException::class)
-    fun getPositioningData(bssid: Bssid, onlyCached: Boolean): PositioningData? {
+    fun getPositioningData(
+        bssids: List<Bssid>,
+        onlyCachedThreshold: Int,
+    ): List<WifiApPositioningData> {
         val isVerbose = Log.isLoggable(TAG, Log.VERBOSE)
-        checkCache(bssid)?.let {
-            val res = it.orElse(null)
-            if (isVerbose) Log.v(TAG, "getPositioningData: cache hit for $bssid: $res")
-            return res
+        val positioningData = mutableListOf<WifiApPositioningData>()
+        val queryBssids = mutableListOf<Bssid>()
+
+        for (bssid in bssids) {
+            val cacheEntry = checkCache(bssid)
+            if (cacheEntry != null) {
+                val res = cacheEntry.orElse(null)
+                if (isVerbose) Log.v(
+                    TAG,
+                    "getPositioningData: cache hit for $bssid: $res"
+                )
+                if (res != null) {
+                    positioningData.add(WifiApPositioningData(bssid, res))
+                }
+            } else if (positioningData.size < onlyCachedThreshold || queryBssids.isNotEmpty()) {
+                queryBssids.add(bssid)
+            }
         }
 
-        if (onlyCached) {
-            return null
+        if (queryBssids.isEmpty()) {
+            return positioningData
         }
 
-        if (isVerbose) Log.v(TAG, "querying positioning data for $bssid")
-        val apInfos: List<WifiApPositioningData> = service.fetchNearbyApPositioningData(bssid, MAX_RESPONSE_SIZE)
+        if (isVerbose) Log.v(TAG, "querying positioning data for $queryBssids")
+        val apInfos: List<WifiApPositioningData> =
+            service.fetchNearbyApPositioningData(
+                queryBssids,
+                MAX_RESPONSE_SIZE,
+                onlyCachedThreshold
+            )
         if (isVerbose) Log.v(TAG, "service response: $apInfos")
 
         if (apInfos.size > MAX_RESPONSE_SIZE) {
@@ -59,13 +80,21 @@ class WifiPositioningServiceCache(private val service: WifiPositioningService) {
                     return@forEachIndexed
                 }
             }
-            checkCache(bssid)?.let {
-                return it.orElse(null)
+            for ((index, bssid) in queryBssids.withIndex()) {
+                val cacheEntry = checkCache(bssid)
+                if (cacheEntry != null) {
+                    val res = cacheEntry.orElse(null)
+                    res?.let { positioningData.add(WifiApPositioningData(bssid, it)) }
+                } else if (index <= onlyCachedThreshold) {
+                    Log.w(
+                        TAG,
+                        "cache lookup for $bssid failed after service.fetchAccessPointInfo()"
+                    )
+                }
             }
         }
 
-        Log.w(TAG, "cache lookup failed after service.fetchAccessPointInfo()")
-        return null
+        return positioningData
     }
 
     private fun checkCache(bssid: Bssid): Optional<PositioningData>? {
