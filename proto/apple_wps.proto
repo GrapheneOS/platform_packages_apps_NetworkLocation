@@ -5,6 +5,7 @@ package app.grapheneos.networklocation.proto;
 option java_outer_classname = "AppleWpsProtos";
 
 message Request {
+  // WARNING: Max 5 bssids per request
   repeated BssidWrapper bssid_wrapper = 2;
   // Max number of additional nearby access points that can be included in the response.
   // Should be at least 1, otherwise it defaults to around 400
