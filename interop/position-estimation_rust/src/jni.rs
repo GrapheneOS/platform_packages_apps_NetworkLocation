@@ -23,7 +23,10 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
 ) -> jobject {
     android_logger::init_once(
         Config::default()
-            .with_max_level(log::max_level())
+            // TODO: remove with_max_level once android_logger 0.15.0 or newer ships,
+            // which allows delegating log filtering to liblog when the android-api-30
+            // feature is enabled
+            .with_max_level(log::LevelFilter::Info)
             .with_tag("PositionEstimation"),
     );
 
