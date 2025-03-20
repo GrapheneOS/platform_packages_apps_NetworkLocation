@@ -14,11 +14,15 @@ import java.net.HttpURLConnection
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 import kotlin.math.max
+import kotlin.Pair
+import org.grapheneos.tls.ModernTLSSocketFactory
 
 private const val TAG = "AppleWps"
 private const val EXTRA_VERBOSE_TAG = "AppleWpsVV"
 
 class AppleWifiPositioningService : WifiPositioningService {
+
+    private val tlsSocketFactory = ModernTLSSocketFactory()
 
     @Throws(IOException::class)
     override fun fetchNearbyApPositioningData(bssid: Bssid, maxResultsHint: Int): List<WifiApPositioningData> {
@@ -43,12 +47,15 @@ class AppleWifiPositioningService : WifiPositioningService {
 
     @Throws(IOException::class)
     private fun fetchInner(bssid: Bssid, maxResultsHint: Int): AppleWpsProtos.Response {
-        val url = getServerUrl()
+        val (url, enforceModernTls) = getServerUrl()
 
         verboseLog(TAG) {"request bssid: $bssid"}
 
         val connection = url.openConnection() as HttpsURLConnection
         try {
+            if (enforceModernTls) {
+                connection.sslSocketFactory = tlsSocketFactory
+            }
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
             connection.connectTimeout = 10_000
@@ -123,21 +130,20 @@ class AppleWifiPositioningService : WifiPositioningService {
     }
 
     @Throws(IOException::class)
-    private fun getServerUrl(): URL {
+    private fun getServerUrl(): Pair<URL, Boolean> {
         val context: Context = AppGlobals.getInitialApplication()
         val setting = NETWORK_LOCATION_SETTING.get(context)
-        val urlString = when (setting) {
+        return when (setting) {
             NETWORK_LOCATION_SERVER_GRAPHENEOS_PROXY ->
-                "https://gs-loc.apple.grapheneos.org/clls/wloc"
+                Pair(URL("https://gs-loc.apple.grapheneos.org/clls/wloc"), true)
             NETWORK_LOCATION_SERVER_APPLE ->
-                "https://gs-loc.apple.com/clls/wloc"
+                Pair(URL("https://gs-loc.apple.com/clls/wloc"), false)
             NETWORK_LOCATION_DISABLED ->
                 // network location can be disabled by the user at any point
                 throw IOException("network location setting became disabled")
             else ->
                 throw IllegalStateException("unexpected URL setting: $setting")
         }
-        return URL(urlString)
     }
 }
 
