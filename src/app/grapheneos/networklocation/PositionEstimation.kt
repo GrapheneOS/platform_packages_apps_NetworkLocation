@@ -19,7 +19,7 @@ data class Point(val x: Double, val y: Double, val z: Double?)
 fun rssiToDistance(
     rssi: Double,
     pathLossExponent: Double,
-    rssiAtOneMeter: Double = -40.0
+    rssiAtOneMeter: Double,
 ): Double {
     return 10.0.pow((rssiAtOneMeter - rssi) / (10 * pathLossExponent))
 }
