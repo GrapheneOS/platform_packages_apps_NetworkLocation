@@ -74,6 +74,12 @@ class LocationReportingTask(
         }
     }
 
+    private class EstimatedDistance(
+        var distance: Double,
+        /** variance (1-sigma²) */
+        var variance: Double,
+    )
+
     private class PositionedScanResult(
         val scanResult: ScanResult,
         var estimatedDistance: Double?,
@@ -161,6 +167,7 @@ class LocationReportingTask(
 
         val measurements = bestResults.values.map { result ->
             val positioningData = result.positioningData
+            val estimatedDistance = result.estimatedDistance!!
             // convert position to Cartesian coordinates
             val position = geoPointToEnuPoint(
                 GeoPoint(
