@@ -217,7 +217,7 @@ class LocationReportingTask(
                 refGeoPoint
             )
             val xyPositionVariance =
-                (positioningData.accuracyMeters.toDouble() + sqrt(estimatedDistance.variance)).pow(2)
+                positioningData.accuracyMeters.toDouble().pow(2) + estimatedDistance.variance
             val zPositionVariance = positioningData.verticalAccuracyMeters?.toDouble()?.pow(2)
             Measurement(
                 Position(
