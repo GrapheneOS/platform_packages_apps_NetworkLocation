@@ -76,8 +76,8 @@ class LocationReportingTask(
 
     private class PositionedScanResult(
         val scanResult: ScanResult,
-        val positioningData: PositioningData?,
         var estimatedDistance: Double?,
+        val positioningData: PositioningData,
     )
 
     private fun estimateLocation(scanResults: List<ScanResult>): Location? {
@@ -142,7 +142,7 @@ class LocationReportingTask(
 
         bestResults =
             bestResults.filterValues {
-                it.positioningData != null && it.estimatedDistance != null
+                it.estimatedDistance != null
             } as HashMap<Bssid, PositionedScanResult>
 
         if (bestResults.isEmpty()) {
@@ -152,15 +152,15 @@ class LocationReportingTask(
         // use the median coordinates of nearby APs for protection against around 50%
         // or less of them being in a wildly incorrect location
         val refGeoPoint = GeoPoint(
-            bestResults.values.map { it.positioningData!!.latitude }.median() ?: return null,
-            bestResults.values.map { it.positioningData!!.longitude }.median() ?: return null,
-            bestResults.values.mapNotNull { it.positioningData!!.altitudeMeters }.let {
+            bestResults.values.map { it.positioningData.latitude }.median() ?: return null,
+            bestResults.values.map { it.positioningData.longitude }.median() ?: return null,
+            bestResults.values.mapNotNull { it.positioningData.altitudeMeters }.let {
                 if (it.isNotEmpty()) it.average() else null
             }
         )
 
         val measurements = bestResults.values.map { result ->
-            val positioningData = result.positioningData!!
+            val positioningData = result.positioningData
             // convert position to Cartesian coordinates
             val position = geoPointToEnuPoint(
                 GeoPoint(
