@@ -82,8 +82,8 @@ class LocationReportingTask(
 
     private class PositionedScanResult(
         val scanResult: ScanResult,
-        var estimatedDistance: Double?,
         val positioningData: PositioningData,
+        var estimatedDistance: EstimatedDistance?,
     )
 
     private fun estimateLocation(scanResults: List<ScanResult>): Location? {
@@ -138,9 +138,26 @@ class LocationReportingTask(
 //                }
 //                verboseLog(TAG) { "falling back to RSSI for estimating distance" }
                 for (result in bestResults.values) {
-                    result.estimatedDistance = rssiToDistance(
-                        result.scanResult.level.toDouble(),
-                        3.0,
+                    // TODO: channel width might also affect these
+                    val pathLossExponent = when (result.scanResult.band) {
+                        ScanResult.WIFI_BAND_24_GHZ -> 4.0
+                        // TODO: verify this value
+                        ScanResult.WIFI_BAND_5_GHZ -> 4.0
+                        else -> continue
+                    }
+                    val rssiAtOneMeter = when (result.scanResult.band) {
+                        ScanResult.WIFI_BAND_24_GHZ -> -20.0
+                        // TODO: verify this value
+                        ScanResult.WIFI_BAND_5_GHZ -> -35.0
+                        else -> continue
+                    }
+                    result.estimatedDistance = EstimatedDistance(
+                        rssiToDistance(
+                            result.scanResult.level.toDouble(),
+                            pathLossExponent,
+                            rssiAtOneMeter,
+                        ),
+                        max(0.0, rssiAtOneMeter - result.scanResult.level.toDouble()).pow(2)
                     )
                 }
 //            }
@@ -177,7 +194,8 @@ class LocationReportingTask(
                 ),
                 refGeoPoint
             )
-            val xyPositionVariance = positioningData.accuracyMeters.toDouble().pow(2)
+            val xyPositionVariance =
+                (positioningData.accuracyMeters.toDouble() + sqrt(estimatedDistance.variance)).pow(2)
             val zPositionVariance = positioningData.verticalAccuracyMeters?.toDouble()?.pow(2)
             Measurement(
                 Position(
@@ -197,7 +215,7 @@ class LocationReportingTask(
                         zPositionVariance ?: 0.0,
                     ),
                 ),
-                result.estimatedDistance!!,
+                estimatedDistance.distance,
                 0.0,
             )
         }
