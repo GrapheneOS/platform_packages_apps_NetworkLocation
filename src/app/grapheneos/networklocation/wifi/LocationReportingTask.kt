@@ -138,19 +138,16 @@ class LocationReportingTask(
 //                }
 //                verboseLog(TAG) { "falling back to RSSI for estimating distance" }
                 for (result in bestResults.values) {
-                    // TODO: channel width might also affect these
                     val pathLossExponent = when (result.scanResult.band) {
                         ScanResult.WIFI_BAND_24_GHZ -> 4.0
-                        // TODO: verify these values
-                        ScanResult.WIFI_BAND_5_GHZ -> 4.0
-                        ScanResult.WIFI_BAND_6_GHZ -> 4.0
+                        ScanResult.WIFI_BAND_5_GHZ -> 3.75
+                        ScanResult.WIFI_BAND_6_GHZ -> 3.75
                         else -> continue
                     }
                     val rssiAtOneMeter = when (result.scanResult.band) {
                         ScanResult.WIFI_BAND_24_GHZ -> -20.0
-                        // TODO: verify these values
                         ScanResult.WIFI_BAND_5_GHZ -> -35.0
-                        ScanResult.WIFI_BAND_6_GHZ -> -40.0
+                        ScanResult.WIFI_BAND_6_GHZ -> -35.0
                         else -> continue
                     }
                     result.estimatedDistance = EstimatedDistance(
