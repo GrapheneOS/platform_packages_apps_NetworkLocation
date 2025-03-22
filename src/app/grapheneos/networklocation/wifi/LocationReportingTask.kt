@@ -113,6 +113,26 @@ class LocationReportingTask(
             return null
         }
 
+        val filteredBestResults = HashMap<Bssid, PositionedScanResult>()
+        for (result in bestResults.toList().groupBy { it.first.slice(0..15) }.values) {
+            val bestMatch = result.reduce { best, item ->
+                val bestWins = when {
+                    item.second.positioningData.accuracyMeters < best.second.positioningData.accuracyMeters -> false
+                    else -> true
+                }
+
+                if (bestWins) {
+                    best
+                } else {
+                    item
+                }
+            }
+
+            filteredBestResults[bestMatch.first] = bestMatch.second
+        }
+        bestResults.clear()
+        bestResults.putAll(filteredBestResults)
+
         runBlocking {
             // TODO: use Wi-Fi RTT to estimate distance with RSSI as a fallback
 //            try {
