@@ -39,7 +39,7 @@ class WifiApScanner(private val context: Context) {
         val scanSettings = WifiScanner.ScanSettings().apply {
             // type is WifiScanner.SCAN_TYPE_LOW_LATENCY by default
             band = WifiScanner.WIFI_BAND_BOTH
-            rnrSetting = WifiScanner.WIFI_RNR_NOT_NEEDED
+            rnrSetting = WifiScanner.WIFI_RNR_ENABLED
             hideFromAppOps = true
         }
 
