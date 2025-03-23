@@ -74,7 +74,6 @@ class AppleWifiPositioningService : WifiPositioningService {
                 connection.sslSocketFactory = tlsSocketFactory
             }
             connection.requestMethod = "POST"
-            connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
             connection.connectTimeout = 10_000
             connection.readTimeout = 10_000
             connection.doOutput = true
