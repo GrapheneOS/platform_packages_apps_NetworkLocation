@@ -88,20 +88,20 @@ class LocationReportingTask(
     private fun estimateLocation(scanResults: List<ScanResult>): Location? {
         var bestResults = HashMap<Bssid, PositionedScanResult>()
 
-        val positioningData = mutableListOf<WifiApPositioningData>()
+        val allPositioningData = mutableListOf<WifiApPositioningData>()
 
         try {
             val bssids = scanResults.sortedByDescending { it.level }.map { it.BSSID }
 
             // just in case the potential additional requests fail, add only cached ones
-            positioningData.addAll(service.getPositioningData(bssids, 0))
+            allPositioningData.addAll(service.getPositioningData(bssids, 0))
 
             // don't make additional requests when we have 15 of the closest results with valid
             // positioning data already
             val onlyCachedThreshold = 15
             val result = service.getPositioningData(bssids, onlyCachedThreshold)
-            positioningData.clear()
-            positioningData.addAll(result)
+            allPositioningData.clear()
+            allPositioningData.addAll(result)
         } catch (e: IOException) {
             Log.d(TAG, "unable to obtain positioning data: $e")
             if (Log.isLoggable(TAG, Log.VERBOSE)) {
@@ -109,7 +109,7 @@ class LocationReportingTask(
             }
         }
 
-        for (data in positioningData) {
+        for (data in allPositioningData) {
             val scanResult = scanResults.find { it.BSSID == data.bssid }
             if (scanResult != null && data.positioningData != null) {
                 bestResults[data.bssid] =
