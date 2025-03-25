@@ -76,7 +76,7 @@ class WifiPositioningServiceCache(private val service: WifiPositioningService) {
         synchronized(lruCache) {
             apInfos.forEachIndexed { idx, pd: WifiApPositioningData ->
                 lruCache.put(pd.bssid, Entry(pd))
-                if (idx == MAX_RESPONSE_SIZE) {
+                if (idx == queryBssids.size * MAX_RESPONSE_SIZE) {
                     return@forEachIndexed
                 }
             }
