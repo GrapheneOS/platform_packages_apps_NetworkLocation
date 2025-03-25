@@ -14,8 +14,6 @@ private const val TAG = "WifiPositioningServiceCache"
 typealias Bssid = String
 
 private const val CACHE_CAPACITY = 10_000
-// max number of WifiApPositioningData entries that service should return in a single call
-private const val MAX_RESPONSE_SIZE = 100
 private const val CACHE_CLEANUP_INTERVAL_MILLIS: Long = 15 * 60_000L // 15 minutes
 
 class WifiPositioningServiceCache(private val service: WifiPositioningService) {
@@ -64,21 +62,13 @@ class WifiPositioningServiceCache(private val service: WifiPositioningService) {
         val apInfos: List<WifiApPositioningData> =
             service.fetchNearbyApPositioningData(
                 queryBssids,
-                MAX_RESPONSE_SIZE,
                 onlyCachedThreshold
             )
         if (isVerbose) Log.v(TAG, "service response: $apInfos")
 
-        if (apInfos.size > MAX_RESPONSE_SIZE) {
-            Log.w(TAG, "service response size (${apInfos.size}) is greater than MAX_RESPONSE_SIZE")
-        }
-
         synchronized(lruCache) {
-            apInfos.forEachIndexed { idx, pd: WifiApPositioningData ->
+            for (pd in apInfos) {
                 lruCache.put(pd.bssid, Entry(pd))
-                if (idx == queryBssids.size * MAX_RESPONSE_SIZE) {
-                    return@forEachIndexed
-                }
             }
             for ((index, bssid) in queryBssids.withIndex()) {
                 val cacheEntry = checkCache(bssid)

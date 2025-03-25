@@ -21,6 +21,8 @@ import org.grapheneos.tls.ModernTLSSocketFactory
 private const val TAG = "AppleWps"
 private const val EXTRA_VERBOSE_TAG = "AppleWpsVV"
 
+private const val MAX_ADDITIONAL_RESULTS = 100
+
 class AppleWifiPositioningService : WifiPositioningService {
 
     private val tlsSocketFactory = ModernTLSSocketFactory()
@@ -28,7 +30,6 @@ class AppleWifiPositioningService : WifiPositioningService {
     @Throws(IOException::class)
     override fun fetchNearbyApPositioningData(
         bssids: List<String>,
-        maxResultsHint: Int,
         withPositioningDataThreshold: Int
     ): List<WifiApPositioningData> {
         val result = HashMap<Bssid, PositioningData?>()
@@ -40,7 +41,7 @@ class AppleWifiPositioningService : WifiPositioningService {
             val currentRequestBssids = requestBssids.take(4)
             requestBssids.removeAll(currentRequestBssids)
 
-            val response = fetchInner(currentRequestBssids, maxResultsHint)
+            val response = fetchInner(currentRequestBssids, MAX_ADDITIONAL_RESULTS)
 
             for (ap in response.accessPointList) {
                 val apBssid = normalizeBssid(ap.bssid)
@@ -70,7 +71,7 @@ class AppleWifiPositioningService : WifiPositioningService {
     }
 
     @Throws(IOException::class)
-    private fun fetchInner(bssids: List<Bssid>, maxResultsHint: Int): AppleWpsProtos.Response {
+    private fun fetchInner(bssids: List<Bssid>, maxAdditionalResults: Int): AppleWpsProtos.Response {
         val (url, enforceModernTls) = getServerUrl()
 
         verboseLog(TAG) {"request bssids: $bssids"}
@@ -112,7 +113,7 @@ class AppleWifiPositioningService : WifiPositioningService {
                             .build()
                     })
                     // should be at least 1, otherwise it defaults to around 400
-                    setMaxAdditionalResults(max(1, maxResultsHint - bssids.size))
+                    setMaxAdditionalResults(max(1, maxAdditionalResults))
                     addAllUnknown31(listOf(
                         // seems to control what frequency nearby APs it returns
                         // 1 means all?, while 2 means 5 (and 6? unconfirmed.) only.

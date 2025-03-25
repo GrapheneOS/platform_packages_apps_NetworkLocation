@@ -6,7 +6,6 @@ interface WifiPositioningService {
     @Throws(IOException::class)
     fun fetchNearbyApPositioningData(
         bssids: List<String>,
-        maxResultsHint: Int,
         withPositioningDataThreshold: Int
     ): List<WifiApPositioningData>
 }
