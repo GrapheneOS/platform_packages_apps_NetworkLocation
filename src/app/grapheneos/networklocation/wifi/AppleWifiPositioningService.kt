@@ -8,6 +8,7 @@ import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_SERVER_GRAP
 import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_SETTING
 import android.util.Log
 import app.grapheneos.networklocation.proto.AppleWpsProtos
+import app.grapheneos.networklocation.proto.AppleWpsProtos.DeviceInfo
 import app.grapheneos.networklocation.verboseLog
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -89,16 +90,20 @@ class AppleWifiPositioningService : WifiPositioningService {
             connection.doOutput = true
 
             connection.outputStream.use { outputStream ->
-                val header = byteArrayOf(
-                    0x00, 0x01,
-                    0x00, 0x00,
-                    0x00, 0x00,
-                    0x00, 0x00,
-                    0x00, 0x00,
-                    0x00, 0x01,
-                    0x00, 0x00,
-                    0x00,
-                )
+                val locale = "en-US_US"
+                val identifier = "com.apple.locationd"
+                val version = "15.3.2.24D81"
+
+                outputStream.write(byteArrayOf(0x00, 0x01, 0x00))
+                outputStream.write(locale.length)
+                outputStream.write(locale.toByteArray())
+                outputStream.write(0x00)
+                outputStream.write(identifier.length)
+                outputStream.write(identifier.toByteArray())
+                outputStream.write(0x00)
+                outputStream.write(version.length)
+                outputStream.write(version.toByteArray())
+                outputStream.write(byteArrayOf(0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00))
 
                 val body = AppleWpsProtos.Request.newBuilder().run {
                     addAllBssidWrapper(bssids.map {
@@ -108,10 +113,24 @@ class AppleWifiPositioningService : WifiPositioningService {
                     })
                     // should be at least 1, otherwise it defaults to around 400
                     setMaxAdditionalResults(max(1, maxResultsHint - bssids.size))
+                    addAllUnknown31(listOf(
+                        // seems to control what frequency nearby APs it returns
+                        // 1 means all?, while 2 means 5 (and 6? unconfirmed.) only.
+                        1,
+                        // unknown
+                        2,
+                    ))
+                    setUnknown32(2)
+                    setDeviceInfo(
+                        DeviceInfo.newBuilder()
+                            .setOsVersion("macOS15.3.2/24D81")
+                            .setArch("arm64")
+                            .build()
+                    )
+
                     build()
                 }
 
-                outputStream.write(header)
                 body.writeDelimitedTo(outputStream)
             }
 
@@ -149,12 +168,12 @@ class AppleWifiPositioningService : WifiPositioningService {
         val latitude = pd.latitude * 0.000_000_01;
         val longitude = pd.longitude * 0.000_000_01
         val altitudeMeters = pd.altitudeMeters.let {
-            // the api returns -1 or -500 for unknown altitude
-            if ((it == -1L) || (it == -500L)) null else it
+            // the api returns -100 or -50000 for unknown altitude
+            if ((it == -100L) || (it == -50000L)) null else it / 100
         }
         val verticalAccuracyMeters = pd.verticalAccuracyMeters.let {
-            // the api returns -1 for unknown vertical accuracy (altitude accuracy)
-            if (it == -1L || altitudeMeters == null) null else it
+            // the api returns -100 for unknown vertical accuracy (altitude accuracy)
+            if (it == -100L || altitudeMeters == null) null else it / 100
         }
         return PositioningData(latitude, longitude, pd.accuracyMeters, altitudeMeters, verticalAccuracyMeters)
     }
