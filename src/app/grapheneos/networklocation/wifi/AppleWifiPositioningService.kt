@@ -32,9 +32,14 @@ class AppleWifiPositioningService : WifiPositioningService {
     ): List<WifiApPositioningData> {
         val result = HashMap<Bssid, PositioningData?>()
 
-        // the service only allows up to 5 bssids per request
-        for (requestBssids in bssids.chunked(5)) {
-            val response = fetchInner(requestBssids, maxResultsHint)
+        val requestBssids = bssids.toMutableList()
+
+        while (requestBssids.isNotEmpty()) {
+            // the service only allows up to 4 bssids per request
+            val currentRequestBssids = requestBssids.take(4)
+            requestBssids.removeAll(currentRequestBssids)
+
+            val response = fetchInner(currentRequestBssids, maxResultsHint)
 
             for (ap in response.accessPointList) {
                 val apBssid = normalizeBssid(ap.bssid)
@@ -42,9 +47,10 @@ class AppleWifiPositioningService : WifiPositioningService {
                     Log.w(TAG, "invalid bssid ${ap.bssid}")
                     continue
                 }
+                requestBssids.remove(apBssid)
                 result.putIfAbsent(apBssid, convertPositioningData(ap.positioningData))
             }
-            for (bssid in requestBssids) {
+            for (bssid in currentRequestBssids) {
                 if (!result.any { it.key == bssid }) {
                     Log.d(
                         TAG,
