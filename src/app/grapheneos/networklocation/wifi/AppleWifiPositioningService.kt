@@ -133,14 +133,12 @@ class AppleWifiPositioningService : WifiPositioningService {
                     })
                     // should be at least 1, otherwise it defaults to around 400
                     setMaxAdditionalResults(max(1, maxAdditionalResults))
-                    addAllUnknown31(listOf(
-                        // seems to control what frequency nearby APs it returns
-                        // 1 means all?, while 2 means 5 (and 6? unconfirmed.) only.
-                        1,
-                        // unknown
-                        2,
-                    ))
-                    setUnknown32(2)
+                    val wifiBands = listOf(
+                        1,  // 2.4GHz
+                        2,  // 5GHz
+                    )
+                    addAllWifiBands(wifiBands)
+                    setWifiBandsSize(wifiBands.size)
                     setDeviceInfo(
                         DeviceInfo.newBuilder()
                             .setOsVersion("macOS15.3.2/24D81")
