@@ -6,6 +6,7 @@ import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_DISABLED
 import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_SERVER_APPLE
 import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_SERVER_GRAPHENEOS_PROXY
 import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_SETTING
+import android.os.SystemClock
 import android.util.Log
 import app.grapheneos.networklocation.proto.AppleWpsProtos
 import app.grapheneos.networklocation.proto.AppleWpsProtos.DeviceInfo
@@ -15,17 +16,23 @@ import java.net.HttpURLConnection
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 import kotlin.math.max
-import kotlin.Pair
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import org.grapheneos.tls.ModernTLSSocketFactory
 
 private const val TAG = "AppleWps"
 private const val EXTRA_VERBOSE_TAG = "AppleWpsVV"
 
+private const val THROTTLED_ADDITIONAL_RESULTS = 8
 private const val MAX_ADDITIONAL_RESULTS = 100
+private val THROTTLE_COOLDOWN = 10.seconds
+private const val THROTTLE_TRIGGER_RESULT_COUNT = 17
 
 class AppleWifiPositioningService : WifiPositioningService {
 
     private val tlsSocketFactory = ModernTLSSocketFactory()
+
+    private var throttleTriggeredElapsedRealtime = -THROTTLE_COOLDOWN
 
     @Throws(IOException::class)
     override fun fetchNearbyApPositioningData(
@@ -41,7 +48,19 @@ class AppleWifiPositioningService : WifiPositioningService {
             val currentRequestBssids = requestBssids.take(4)
             requestBssids.removeAll(currentRequestBssids)
 
-            val response = fetchInner(currentRequestBssids, MAX_ADDITIONAL_RESULTS)
+            val response = fetchInner(
+                currentRequestBssids,
+                if (SystemClock.elapsedRealtime().milliseconds - throttleTriggeredElapsedRealtime >= THROTTLE_COOLDOWN) {
+                    MAX_ADDITIONAL_RESULTS
+                } else {
+                    THROTTLED_ADDITIONAL_RESULTS
+                }
+            )
+
+            if (response.accessPointCount >= THROTTLE_TRIGGER_RESULT_COUNT) {
+                verboseLog(TAG) { "response AP count (${response.accessPointCount}) triggered throttle" }
+                throttleTriggeredElapsedRealtime = SystemClock.elapsedRealtime().milliseconds
+            }
 
             for (ap in response.accessPointList) {
                 val apBssid = normalizeBssid(ap.bssid)
