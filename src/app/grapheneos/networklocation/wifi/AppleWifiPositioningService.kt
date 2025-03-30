@@ -24,6 +24,7 @@ import org.grapheneos.tls.ModernTLSSocketFactory
 private const val TAG = "AppleWps"
 private const val EXTRA_VERBOSE_TAG = "AppleWpsVV"
 
+private const val MAX_REQUEST_NETWORKS = 40
 private const val THROTTLED_ADDITIONAL_RESULTS = 8
 private const val MAX_ADDITIONAL_RESULTS = 100
 private val THROTTLE_COOLDOWN = 10.seconds
@@ -36,53 +37,39 @@ class AppleWifiPositioningService : WifiPositioningService {
     private var throttleTriggeredElapsedRealtime = -THROTTLE_COOLDOWN
 
     @Throws(IOException::class)
-    override fun fetchNearbyApPositioningData(
-        bssids: List<String>,
-        withPositioningDataThreshold: Int
-    ): List<WifiApPositioningData> {
+    override fun fetchNearbyApPositioningData(bssids: List<String>): List<WifiApPositioningData> {
+        val requestBssids = bssids.take(MAX_REQUEST_NETWORKS)
         val result = HashMap<Bssid, PositioningData?>()
 
-        val requestBssids = bssids.toMutableList()
-
-        while (requestBssids.isNotEmpty()) {
-            val currentRequestBssids = requestBssids.take(4)
-            requestBssids.removeAll(currentRequestBssids)
-
-            val response = fetchInner(
-                currentRequestBssids,
-                if (SystemClock.elapsedRealtime().milliseconds - throttleTriggeredElapsedRealtime >= THROTTLE_COOLDOWN) {
-                    MAX_ADDITIONAL_RESULTS
-                } else {
-                    THROTTLED_ADDITIONAL_RESULTS
-                }
-            )
-
-            if (response.accessPointCount >= THROTTLE_TRIGGER_RESULT_COUNT) {
-                verboseLog(TAG) { "response AP count (${response.accessPointCount}) triggered throttle" }
-                throttleTriggeredElapsedRealtime = SystemClock.elapsedRealtime().milliseconds
+        val response = fetchInner(
+            requestBssids,
+            if (SystemClock.elapsedRealtime().milliseconds - throttleTriggeredElapsedRealtime >= THROTTLE_COOLDOWN) {
+                MAX_ADDITIONAL_RESULTS
+            } else {
+                THROTTLED_ADDITIONAL_RESULTS
             }
+        )
 
-            for (ap in response.accessPointList) {
-                val apBssid = normalizeBssid(ap.bssid)
-                if (apBssid == null) {
-                    Log.w(TAG, "invalid bssid ${ap.bssid}")
-                    continue
-                }
-                requestBssids.remove(apBssid)
-                result.putIfAbsent(apBssid, convertPositioningData(ap.positioningData))
-            }
-            for (bssid in currentRequestBssids) {
-                if (!result.any { it.key == bssid }) {
-                    Log.d(
-                        TAG,
-                        "server didn't return positioning data for one of the requested bssids $bssid"
-                    )
-                    result.putIfAbsent(bssid, null)
-                }
-            }
+        if (response.accessPointCount >= THROTTLE_TRIGGER_RESULT_COUNT) {
+            verboseLog(TAG) { "response AP count (${response.accessPointCount}) triggered throttle" }
+            throttleTriggeredElapsedRealtime = SystemClock.elapsedRealtime().milliseconds
+        }
 
-            if (bssids.count { result[it] != null } >= withPositioningDataThreshold) {
-                break
+        for (ap in response.accessPointList) {
+            val apBssid = normalizeBssid(ap.bssid)
+            if (apBssid == null) {
+                Log.w(TAG, "invalid bssid ${ap.bssid}")
+                continue
+            }
+            result.putIfAbsent(apBssid, convertPositioningData(ap.positioningData))
+        }
+        for (bssid in requestBssids) {
+            if (!result.any { it.key == bssid }) {
+                Log.d(
+                    TAG,
+                    "server didn't return positioning data for one of the requested bssids $bssid"
+                )
+                result.putIfAbsent(bssid, null)
             }
         }
 

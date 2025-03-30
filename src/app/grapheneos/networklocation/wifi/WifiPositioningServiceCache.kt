@@ -60,10 +60,7 @@ class WifiPositioningServiceCache(private val service: WifiPositioningService) {
 
         if (isVerbose) Log.v(TAG, "querying positioning data for $queryBssids")
         val apInfos: List<WifiApPositioningData> =
-            service.fetchNearbyApPositioningData(
-                queryBssids,
-                onlyCachedThreshold
-            )
+            service.fetchNearbyApPositioningData(queryBssids)
         if (isVerbose) Log.v(TAG, "service response: $apInfos")
 
         synchronized(lruCache) {
