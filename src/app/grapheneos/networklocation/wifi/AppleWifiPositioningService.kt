@@ -130,7 +130,7 @@ class AppleWifiPositioningService : WifiPositioningService {
                     build()
                 }
 
-                outputStream.writeInt(body.toByteArray().size)
+                outputStream.writeInt(body.getSerializedSize())
                 body.writeTo(outputStream)
             }
 
