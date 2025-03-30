@@ -11,6 +11,7 @@ import android.util.Log
 import app.grapheneos.networklocation.proto.AppleWpsProtos
 import app.grapheneos.networklocation.proto.AppleWpsProtos.DeviceInfo
 import app.grapheneos.networklocation.verboseLog
+import java.io.DataOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -44,7 +45,6 @@ class AppleWifiPositioningService : WifiPositioningService {
         val requestBssids = bssids.toMutableList()
 
         while (requestBssids.isNotEmpty()) {
-            // the service only allows up to 4 bssids per request
             val currentRequestBssids = requestBssids.take(4)
             requestBssids.removeAll(currentRequestBssids)
 
@@ -109,7 +109,7 @@ class AppleWifiPositioningService : WifiPositioningService {
             connection.readTimeout = 10_000
             connection.doOutput = true
 
-            connection.outputStream.use { outputStream ->
+            DataOutputStream(connection.outputStream).use { outputStream ->
                 val locale = "en-US_US"
                 val identifier = "com.apple.locationd"
                 val version = "15.3.2.24D81"
@@ -123,7 +123,7 @@ class AppleWifiPositioningService : WifiPositioningService {
                 outputStream.write(0x00)
                 outputStream.write(version.length)
                 outputStream.write(version.toByteArray())
-                outputStream.write(byteArrayOf(0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00))
+                outputStream.write(byteArrayOf(0x00, 0x00, 0x00, 0x01))
 
                 val body = AppleWpsProtos.Request.newBuilder().run {
                     addAllBssidWrapper(bssids.map {
@@ -149,7 +149,8 @@ class AppleWifiPositioningService : WifiPositioningService {
                     build()
                 }
 
-                body.writeDelimitedTo(outputStream)
+                outputStream.writeInt(body.toByteArray().size)
+                body.writeTo(outputStream)
             }
 
             val responseCode = connection.responseCode
