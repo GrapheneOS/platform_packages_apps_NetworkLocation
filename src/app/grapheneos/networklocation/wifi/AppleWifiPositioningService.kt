@@ -140,7 +140,7 @@ class AppleWifiPositioningService : WifiPositioningService {
             }
             val ignoredHeaderSize = 10
             val protoBytes: ByteArray = connection.inputStream.use { inputStream ->
-                inputStream.skip(ignoredHeaderSize.toLong())
+                inputStream.skipNBytes(ignoredHeaderSize.toLong())
                 inputStream.readAllBytes()
             }
             val response = AppleWpsProtos.Response.parseFrom(protoBytes)
