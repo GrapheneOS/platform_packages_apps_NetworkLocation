@@ -64,13 +64,7 @@ class AppleWifiPositioningService : WifiPositioningService {
             result.putIfAbsent(apBssid, convertPositioningData(ap.positioningData))
         }
         for (bssid in requestBssids) {
-            if (!result.any { it.key == bssid }) {
-                Log.d(
-                    TAG,
-                    "server didn't return positioning data for one of the requested bssids $bssid"
-                )
-                result.putIfAbsent(bssid, null)
-            }
+            result.putIfAbsent(bssid, null)
         }
 
         return result.map { WifiApPositioningData(it.key, it.value) }
