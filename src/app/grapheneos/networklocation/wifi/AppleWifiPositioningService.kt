@@ -110,19 +110,19 @@ class AppleWifiPositioningService : WifiPositioningService {
             connection.doOutput = true
 
             DataOutputStream(connection.outputStream).use { outputStream ->
-                val locale = "en-US_US"
-                val identifier = "com.apple.locationd"
-                val version = "15.3.2.24D81"
+                val locale = "en-US_US".toByteArray()
+                val identifier = "com.apple.locationd".toByteArray()
+                val version = "15.3.2.24D81".toByteArray()
 
                 outputStream.write(byteArrayOf(0x00, 0x01, 0x00))
-                outputStream.write(locale.length)
-                outputStream.write(locale.toByteArray())
+                outputStream.write(locale.size)
+                outputStream.write(locale)
                 outputStream.write(0x00)
-                outputStream.write(identifier.length)
-                outputStream.write(identifier.toByteArray())
+                outputStream.write(identifier.size)
+                outputStream.write(identifier)
                 outputStream.write(0x00)
-                outputStream.write(version.length)
-                outputStream.write(version.toByteArray())
+                outputStream.write(version.size)
+                outputStream.write(version)
                 outputStream.write(byteArrayOf(0x00, 0x00, 0x00, 0x01))
 
                 val body = AppleWpsProtos.Request.newBuilder().run {
