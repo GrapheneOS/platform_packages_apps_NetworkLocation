@@ -42,9 +42,47 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
 
     let mut measurements_converted = Vec::with_capacity(len);
 
+    let measurement_class_path =
+        "app/grapheneos/networklocation/interop/position_estimation/Measurement";
     let position_class_path = "app/grapheneos/networklocation/interop/position_estimation/Position";
     let coordinate_class_path =
         "app/grapheneos/networklocation/interop/position_estimation/Coordinate";
+
+    let measurement_position_field_id = env
+        .get_field_id(
+            measurement_class_path,
+            "position",
+            format!("L{};", position_class_path),
+        )
+        .expect("should be able to get measurement class' position field id");
+
+    let position_coords_signature = format!("L{};", coordinate_class_path);
+    let position_x_field_id = env
+        .get_field_id(position_class_path, "x", &position_coords_signature)
+        .expect("should be able to get position class' x field id");
+    let position_y_field_id = env
+        .get_field_id(position_class_path, "y", &position_coords_signature)
+        .expect("should be able to get position class' y field id");
+    let position_z_field_id = env
+        .get_field_id(position_class_path, "z", position_coords_signature)
+        .expect("should be able to get position class' z field id");
+
+    let coordinate_real_field_id = env
+        .get_field_id(coordinate_class_path, "real", "Z")
+        .expect("should be able to get coordinate class' real field id");
+    let coordinate_value_field_id = env
+        .get_field_id(coordinate_class_path, "value", "D")
+        .expect("should be able to get coordinate class' value field id");
+    let coordinate_variance_field_id = env
+        .get_field_id(coordinate_class_path, "variance", "D")
+        .expect("should be able to get coordinate class' variance field id");
+
+    let measurement_distance_field_id = env
+        .get_field_id(measurement_class_path, "distance", "D")
+        .expect("should be able to get measurement class' distance field id");
+    let measurement_probability_field_id = env
+        .get_field_id(measurement_class_path, "probability", "D")
+        .expect("should be able to get measurement class' probability field id");
 
     for index in 0..len {
         let measurement_obj = env
@@ -55,27 +93,39 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
             .expect("should be able to get measurement");
 
         let position_obj = env
-            .get_field(
+            .get_field_unchecked(
                 &measurement_obj,
-                "position",
-                format!("L{};", position_class_path),
+                measurement_position_field_id,
+                jni::signature::ReturnType::Object,
             )
-            .expect("should be able to get position from measurement")
+            .expect("should be able to get position field from measurement")
             .l()
             .expect("position should be an object");
 
         let x_obj = env
-            .get_field(&position_obj, "x", format!("L{};", coordinate_class_path))
+            .get_field_unchecked(
+                &position_obj,
+                position_x_field_id,
+                jni::signature::ReturnType::Object,
+            )
             .expect("should be able to get x from position")
             .l()
             .expect("x should be an object");
         let y_obj = env
-            .get_field(&position_obj, "y", format!("L{};", coordinate_class_path))
+            .get_field_unchecked(
+                &position_obj,
+                position_y_field_id,
+                jni::signature::ReturnType::Object,
+            )
             .expect("should be able to get y from position")
             .l()
             .expect("y should be an object");
         let z_obj = env
-            .get_field(&position_obj, "z", format!("L{};", coordinate_class_path))
+            .get_field_unchecked(
+                &position_obj,
+                position_z_field_id,
+                jni::signature::ReturnType::Object,
+            )
             .expect("should be able to get z from position")
             .l()
             .expect("z should be an object");
@@ -84,63 +134,125 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
             position: Position {
                 x: Coordinate {
                     real: env
-                        .get_field(&x_obj, "real", "Z")
+                        .get_field_unchecked(
+                            &x_obj,
+                            coordinate_real_field_id,
+                            jni::signature::ReturnType::Primitive(
+                                jni::signature::Primitive::Boolean,
+                            ),
+                        )
                         .expect("should be able to get real from x")
                         .z()
                         .expect("real should be a boolean"),
                     value: env
-                        .get_field(&x_obj, "value", "D")
+                        .get_field_unchecked(
+                            &x_obj,
+                            coordinate_value_field_id,
+                            jni::signature::ReturnType::Primitive(
+                                jni::signature::Primitive::Double,
+                            ),
+                        )
                         .expect("should be able to get value from x")
                         .d()
                         .expect("value should be double"),
                     variance: env
-                        .get_field(&x_obj, "variance", "D")
+                        .get_field_unchecked(
+                            &x_obj,
+                            coordinate_variance_field_id,
+                            jni::signature::ReturnType::Primitive(
+                                jni::signature::Primitive::Double,
+                            ),
+                        )
                         .expect("should be able to get variance from x")
                         .d()
                         .expect("variance should be a double"),
                 },
                 y: Coordinate {
                     real: env
-                        .get_field(&y_obj, "real", "Z")
+                        .get_field_unchecked(
+                            &y_obj,
+                            coordinate_real_field_id,
+                            jni::signature::ReturnType::Primitive(
+                                jni::signature::Primitive::Boolean,
+                            ),
+                        )
                         .expect("should be able to get real from y")
                         .z()
                         .expect("real should be a boolean"),
                     value: env
-                        .get_field(&y_obj, "value", "D")
+                        .get_field_unchecked(
+                            &y_obj,
+                            coordinate_value_field_id,
+                            jni::signature::ReturnType::Primitive(
+                                jni::signature::Primitive::Double,
+                            ),
+                        )
                         .expect("should be able to get value from y")
                         .d()
                         .expect("value should be double"),
                     variance: env
-                        .get_field(&y_obj, "variance", "D")
+                        .get_field_unchecked(
+                            &y_obj,
+                            coordinate_variance_field_id,
+                            jni::signature::ReturnType::Primitive(
+                                jni::signature::Primitive::Double,
+                            ),
+                        )
                         .expect("should be able to get variance from y")
                         .d()
                         .expect("variance should be a double"),
                 },
                 z: Coordinate {
                     real: env
-                        .get_field(&z_obj, "real", "Z")
+                        .get_field_unchecked(
+                            &z_obj,
+                            coordinate_real_field_id,
+                            jni::signature::ReturnType::Primitive(
+                                jni::signature::Primitive::Boolean,
+                            ),
+                        )
                         .expect("should be able to get real from z")
                         .z()
                         .expect("real should be a boolean"),
                     value: env
-                        .get_field(&z_obj, "value", "D")
+                        .get_field_unchecked(
+                            &z_obj,
+                            coordinate_value_field_id,
+                            jni::signature::ReturnType::Primitive(
+                                jni::signature::Primitive::Double,
+                            ),
+                        )
                         .expect("should be able to get value from z")
                         .d()
                         .expect("value should be double"),
                     variance: env
-                        .get_field(&z_obj, "variance", "D")
+                        .get_field_unchecked(
+                            &z_obj,
+                            coordinate_variance_field_id,
+                            jni::signature::ReturnType::Primitive(
+                                jni::signature::Primitive::Double,
+                            ),
+                        )
                         .expect("should be able to get variance from z")
                         .d()
                         .expect("variance should be a double"),
                 },
             },
             distance: env
-                .get_field(&measurement_obj, "distance", "D")
+                .get_field_unchecked(
+                    &measurement_obj,
+                    measurement_distance_field_id,
+                    jni::signature::ReturnType::Primitive(jni::signature::Primitive::Double),
+                )
                 .expect("should be able to get distance from measurement")
                 .d()
                 .expect("distance should be a double"),
             probability: env
-                .get_field(&measurement_obj, "probability", "D")
+                .get_field_unchecked(
+                    &measurement_obj,
+                    measurement_probability_field_id,
+                    jni::signature::ReturnType::Primitive(jni::signature::Primitive::Double),
+                )
                 .expect("should be able to get probability from measurement")
                 .d()
                 .expect("probability should be a double"),
@@ -165,10 +277,11 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
                 .find_class(position_class_path)
                 .expect("should be able to find position class");
 
+            let coordinate_class_signature = "(ZDD)V";
             let x_obj = env
                 .new_object(
                     coordinate_class_path,
-                    "(ZDD)V",
+                    coordinate_class_signature,
                     &[
                         position.x.real.into(),
                         position.x.value.into(),
@@ -179,7 +292,7 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
             let y_obj = env
                 .new_object(
                     coordinate_class_path,
-                    "(ZDD)V",
+                    coordinate_class_signature,
                     &[
                         position.y.real.into(),
                         position.y.value.into(),
@@ -190,7 +303,7 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
             let z_obj = env
                 .new_object(
                     coordinate_class_path,
-                    "(ZDD)V",
+                    coordinate_class_signature,
                     &[
                         position.z.real.into(),
                         position.z.value.into(),
