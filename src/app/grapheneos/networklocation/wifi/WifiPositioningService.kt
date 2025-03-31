@@ -20,9 +20,9 @@ class WifiApPositioningData(
 class PositioningData(
     val latitude: Double,
     val longitude: Double,
-    val accuracyMeters: Long,
-    val altitudeMeters: Long?,
-    val verticalAccuracyMeters: Long?,
+    val accuracyMeters: Int,
+    val altitudeMeters: Int?,
+    val verticalAccuracyMeters: Int?,
 ) {
     override fun toString(): String {
         return StringBuilder().run {
