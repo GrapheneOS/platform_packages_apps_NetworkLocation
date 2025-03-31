@@ -96,17 +96,16 @@ class AppleWifiPositioningService : WifiPositioningService {
                 val locale = "en-US_US".toByteArray()
                 val identifier = "com.apple.locationd".toByteArray()
                 val version = "15.3.2.24D81".toByteArray()
+                val requestCode = 1
 
-                outputStream.write(byteArrayOf(0x00, 0x01, 0x00))
-                outputStream.write(locale.size)
+                outputStream.writeShort(1) // hardcoded
+                outputStream.writeShort(locale.size)
                 outputStream.write(locale)
-                outputStream.write(0x00)
-                outputStream.write(identifier.size)
+                outputStream.writeShort(identifier.size)
                 outputStream.write(identifier)
-                outputStream.write(0x00)
-                outputStream.write(version.size)
+                outputStream.writeShort(version.size)
                 outputStream.write(version)
-                outputStream.write(byteArrayOf(0x00, 0x00, 0x00, 0x01))
+                outputStream.writeInt(requestCode)
 
                 val protobufData = ALSLocationRequestResponse.newBuilder().run {
                     addAllWirelessAps(bssids.map {
