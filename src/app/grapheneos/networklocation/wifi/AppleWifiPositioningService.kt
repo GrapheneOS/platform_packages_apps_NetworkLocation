@@ -8,8 +8,10 @@ import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_SERVER_GRAP
 import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_SETTING
 import android.os.SystemClock
 import android.util.Log
-import app.grapheneos.networklocation.proto.AppleWpsProtos
-import app.grapheneos.networklocation.proto.AppleWpsProtos.DeviceInfo
+import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocation
+import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationRequestResponse
+import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationRequestResponse.ALSMeta
+import app.grapheneos.networklocation.proto.AppleWpsProtos.WirelessAP
 import app.grapheneos.networklocation.verboseLog
 import java.io.DataOutputStream
 import java.io.IOException
@@ -50,18 +52,18 @@ class AppleWifiPositioningService : WifiPositioningService {
             }
         )
 
-        if (response.accessPointCount >= THROTTLE_TRIGGER_RESULT_COUNT) {
-            verboseLog(TAG) { "response AP count (${response.accessPointCount}) triggered throttle" }
+        if (response.wirelessApsCount >= THROTTLE_TRIGGER_RESULT_COUNT) {
+            verboseLog(TAG) { "response AP count (${response.wirelessApsCount}) triggered throttle" }
             throttleTriggeredElapsedRealtime = SystemClock.elapsedRealtime().milliseconds
         }
 
-        for (ap in response.accessPointList) {
-            val apBssid = normalizeBssid(ap.bssid)
+        for (ap in response.wirelessApsList) {
+            val apBssid = normalizeBssid(ap.macId)
             if (apBssid == null) {
-                Log.w(TAG, "invalid bssid ${ap.bssid}")
+                Log.w(TAG, "invalid bssid ${ap.macId}")
                 continue
             }
-            result.putIfAbsent(apBssid, convertPositioningData(ap.positioningData))
+            result.putIfAbsent(apBssid, convertPositioningData(ap.location))
         }
         for (bssid in requestBssids) {
             result.putIfAbsent(bssid, null)
@@ -71,7 +73,7 @@ class AppleWifiPositioningService : WifiPositioningService {
     }
 
     @Throws(IOException::class)
-    private fun fetchInner(bssids: List<Bssid>, maxAdditionalResults: Int): AppleWpsProtos.Response {
+    private fun fetchInner(bssids: List<Bssid>, maxAdditionalResults: Int): ALSLocationRequestResponse {
         val (url, enforceModernTls) = getServerUrl()
 
         verboseLog(TAG) {"request bssids: $bssids"}
@@ -106,32 +108,32 @@ class AppleWifiPositioningService : WifiPositioningService {
                 outputStream.write(version)
                 outputStream.write(byteArrayOf(0x00, 0x00, 0x00, 0x01))
 
-                val body = AppleWpsProtos.Request.newBuilder().run {
-                    addAllBssidWrapper(bssids.map {
-                        AppleWpsProtos.BssidWrapper.newBuilder()
-                            .setBssid(it)
+                val protobufData = ALSLocationRequestResponse.newBuilder().run {
+                    addAllWirelessAps(bssids.map {
+                        WirelessAP.newBuilder()
+                            .setMacId(it)
                             .build()
                     })
                     // should be at least 1, otherwise it defaults to around 400
-                    setMaxAdditionalResults(max(1, maxAdditionalResults))
+                    setNumberOfSurroundingWifis(max(1, maxAdditionalResults))
                     val wifiBands = listOf(
-                        1,  // 2.4GHz
-                        2,  // 5GHz
+                        ALSLocationRequestResponse.WifiBand.K2DOT4GHZ,
+                        ALSLocationRequestResponse.WifiBand.K5GHZ,
                     )
-                    addAllWifiBands(wifiBands)
-                    setWifiBandsSize(wifiBands.size)
-                    setDeviceInfo(
-                        DeviceInfo.newBuilder()
-                            .setOsVersion("macOS15.3.2/24D81")
-                            .setArch("arm64")
+                    addAllSurroundingWifiBands(wifiBands)
+                    setWifiAltitudeScale(ALSLocationRequestResponse.WifiAltitudeScale.KWIFI_ALTITUDE_SCALE_10_TO_THE_2)
+                    setMeta(
+                        ALSMeta.newBuilder()
+                            .setSoftwareBuild("macOS15.3.2/24D81")
+                            .setProductId("arm64")
                             .build()
                     )
 
                     build()
                 }
 
-                outputStream.writeInt(body.getSerializedSize())
-                body.writeTo(outputStream)
+                outputStream.writeInt(protobufData.getSerializedSize())
+                protobufData.writeTo(outputStream)
             }
 
             val responseCode = connection.responseCode
@@ -143,16 +145,16 @@ class AppleWifiPositioningService : WifiPositioningService {
                 inputStream.skipNBytes(ignoredHeaderSize.toLong())
                 inputStream.readAllBytes()
             }
-            val response = AppleWpsProtos.Response.parseFrom(protoBytes)
+            val response = ALSLocationRequestResponse.parseFrom(protoBytes)
             verboseLog(TAG) {
-                "response AP list size: ${response.accessPointCount}, " +
+                "response AP list size: ${response.wirelessApsCount}, " +
                         "byte size: ${protoBytes.size + ignoredHeaderSize}"
             }
             if (Log.isLoggable(EXTRA_VERBOSE_TAG, Log.VERBOSE)) {
                 Log.v(EXTRA_VERBOSE_TAG, "response headers: " + connection.headerFields)
-                response.accessPointList.forEachIndexed { i, ap ->
-                    Log.v(EXTRA_VERBOSE_TAG, "response[$i]: bssid: ${ap.bssid}, " +
-                            "positioning data: ${convertPositioningData(ap.positioningData)}")
+                response.wirelessApsList.forEachIndexed { i, ap ->
+                    Log.v(EXTRA_VERBOSE_TAG, "response[$i]: bssid: ${ap.macId}, " +
+                            "positioning data: ${convertPositioningData(ap.location)}")
                 }
             }
             return response
@@ -161,21 +163,21 @@ class AppleWifiPositioningService : WifiPositioningService {
         }
     }
 
-    private fun convertPositioningData(pd: AppleWpsProtos.PositioningData): PositioningData? {
+    private fun convertPositioningData(pd: ALSLocation): PositioningData? {
         if (pd.latitude == -18000000000) {
             return null
         }
         val latitude = pd.latitude * 0.000_000_01;
         val longitude = pd.longitude * 0.000_000_01
-        val altitudeMeters = pd.altitudeMeters.let {
+        val altitudeMeters = pd.altitude.let {
             // the api returns -100 or -50000 for unknown altitude
-            if ((it == -100L) || (it == -50000L)) null else it / 100
+            if ((it == -100) || (it == -50000)) null else it / 100
         }
-        val verticalAccuracyMeters = pd.verticalAccuracyMeters.let {
+        val verticalAccuracyMeters = pd.verticalAccuracy.let {
             // the api returns -100 for unknown vertical accuracy (altitude accuracy)
-            if (it == -100L || altitudeMeters == null) null else it / 100
+            if (it == -100 || altitudeMeters == null) null else it / 100
         }
-        return PositioningData(latitude, longitude, pd.accuracyMeters, altitudeMeters, verticalAccuracyMeters)
+        return PositioningData(latitude, longitude, pd.accuracy, altitudeMeters, verticalAccuracyMeters)
     }
 
     @Throws(IOException::class)
