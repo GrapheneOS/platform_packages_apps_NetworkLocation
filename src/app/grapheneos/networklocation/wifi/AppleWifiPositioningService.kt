@@ -87,7 +87,7 @@ class AppleWifiPositioningService : WifiPositioningService {
             connection.setRequestProperty("Accept", "*/*")
             connection.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
             connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-            connection.setRequestProperty("User-Agent", "locationd/2956.0.6 CFNetwork/3826.400.120 Darwin/24.3.0")
+            connection.setRequestProperty("User-Agent", "locationd/2960.0.57 CFNetwork/3826.500.111.1.1 Darwin/24.4.0")
             connection.connectTimeout = 10_000
             connection.readTimeout = 10_000
             connection.doOutput = true
@@ -95,7 +95,7 @@ class AppleWifiPositioningService : WifiPositioningService {
             DataOutputStream(connection.outputStream).use { outputStream ->
                 val locale = "en-US_US".toByteArray()
                 val identifier = "com.apple.locationd".toByteArray()
-                val version = "15.3.2.24D81".toByteArray()
+                val version = "15.4.24E248".toByteArray()
                 val requestCode = 1
 
                 outputStream.writeShort(1) // hardcoded
@@ -123,7 +123,7 @@ class AppleWifiPositioningService : WifiPositioningService {
                     setWifiAltitudeScale(ALSLocationRequestResponse.WifiAltitudeScale.KWIFI_ALTITUDE_SCALE_10_TO_THE_2)
                     setMeta(
                         ALSMeta.newBuilder()
-                            .setSoftwareBuild("macOS15.3.2/24D81")
+                            .setSoftwareBuild("macOS15.4/24E248")
                             .setProductId("arm64")
                             .build()
                     )
