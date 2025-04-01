@@ -84,7 +84,7 @@ class AppleWifiPositioningService : WifiPositioningService {
                 connection.sslSocketFactory = tlsSocketFactory
             }
             connection.requestMethod = "POST"
-            connection.setRequestProperty("Accept", "_/_")
+            connection.setRequestProperty("Accept", "*/*")
             connection.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
             connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
             connection.setRequestProperty("User-Agent", "locationd/2956.0.6 CFNetwork/3826.400.120 Darwin/24.3.0")
