@@ -4,7 +4,7 @@ package app.grapheneos.networklocation.proto;
 
 option java_outer_classname = "AppleWpsProtos";
 
-message ALSLocationRequestResponse {
+message ALSLocationRequest {
   repeated CellTower cell_towers = 1;
   repeated WirelessAP wireless_aps = 2;
   optional int32 number_of_surrounding_cells = 3;
@@ -47,6 +47,16 @@ message ALSLocationRequestResponse {
     KWIFI_ALTITUDE_SCALE_NONE = 1;
     KWIFI_ALTITUDE_SCALE_10_TO_THE_2 = 2;
   }
+}
+
+message ALSLocationResponse {
+  repeated CellTower cell_towers = 1;
+  repeated WirelessAP wireless_aps = 2;
+
+  repeated CdmaCellTower cdma_cell_towers = 21;
+  repeated LteCellTower lte_cell_towers = 22;
+  repeated ScdmaCellTower scdma_cell_towers = 23;
+  repeated Nr5GCellTower nr5g_cell_towers = 24;
 }
 
 message CellTower {
