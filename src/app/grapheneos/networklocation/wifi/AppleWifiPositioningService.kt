@@ -9,8 +9,9 @@ import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_SETTING
 import android.os.SystemClock
 import android.util.Log
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocation
-import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationRequestResponse
-import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationRequestResponse.ALSMeta
+import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationRequest
+import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationResponse
+import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationRequest.ALSMeta
 import app.grapheneos.networklocation.proto.AppleWpsProtos.WirelessAP
 import app.grapheneos.networklocation.verboseLog
 import java.io.DataOutputStream
@@ -73,7 +74,7 @@ class AppleWifiPositioningService : WifiPositioningService {
     }
 
     @Throws(IOException::class)
-    private fun fetchInner(bssids: List<Bssid>, maxAdditionalResults: Int): ALSLocationRequestResponse {
+    private fun fetchInner(bssids: List<Bssid>, maxAdditionalResults: Int): ALSLocationResponse {
         val (url, enforceModernTls) = getServerUrl()
 
         verboseLog(TAG) {"request bssids: $bssids"}
@@ -107,7 +108,7 @@ class AppleWifiPositioningService : WifiPositioningService {
                 outputStream.write(version)
                 outputStream.writeInt(requestCode)
 
-                val protobufData = ALSLocationRequestResponse.newBuilder().run {
+                val protobufData = ALSLocationRequest.newBuilder().run {
                     addAllWirelessAps(bssids.map {
                         WirelessAP.newBuilder()
                             .setMacId(it)
@@ -116,11 +117,11 @@ class AppleWifiPositioningService : WifiPositioningService {
                     // should be at least 1, otherwise it defaults to around 400
                     setNumberOfSurroundingWifis(max(1, maxAdditionalResults))
                     val wifiBands = listOf(
-                        ALSLocationRequestResponse.WifiBand.K2DOT4GHZ,
-                        ALSLocationRequestResponse.WifiBand.K5GHZ,
+                        ALSLocationRequest.WifiBand.K2DOT4GHZ,
+                        ALSLocationRequest.WifiBand.K5GHZ,
                     )
                     addAllSurroundingWifiBands(wifiBands)
-                    setWifiAltitudeScale(ALSLocationRequestResponse.WifiAltitudeScale.KWIFI_ALTITUDE_SCALE_10_TO_THE_2)
+                    setWifiAltitudeScale(ALSLocationRequest.WifiAltitudeScale.KWIFI_ALTITUDE_SCALE_10_TO_THE_2)
                     setMeta(
                         ALSMeta.newBuilder()
                             .setSoftwareBuild("macOS15.4/24E248")
@@ -144,7 +145,7 @@ class AppleWifiPositioningService : WifiPositioningService {
                 inputStream.skipNBytes(ignoredHeaderSize.toLong())
                 inputStream.readAllBytes()
             }
-            val response = ALSLocationRequestResponse.parseFrom(protoBytes)
+            val response = ALSLocationResponse.parseFrom(protoBytes)
             verboseLog(TAG) {
                 "response AP list size: ${response.wirelessApsCount}, " +
                         "byte size: ${protoBytes.size + ignoredHeaderSize}"
