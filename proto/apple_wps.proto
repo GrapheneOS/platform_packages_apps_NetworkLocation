@@ -59,6 +59,20 @@ message ALSLocationResponse {
   repeated Nr5GCellTower nr5g_cell_towers = 24;
 }
 
+message ALSLocation {
+  int64 latitude = 1;
+  int64 longitude = 2;
+  int32 accuracy = 3;
+  optional int32 location_type = 4;
+  optional int32 altitude = 5;
+  optional int32 vertical_accuracy = 6;
+  optional int32 confidence = 7;
+
+  optional uint32 score = 11;
+  optional int32 reach = 12;
+  optional uint32 info_mask = 13;
+}
+
 message CellTower {
   int32 mcc = 1;
   int32 mnc = 2;
@@ -78,23 +92,53 @@ message WirelessAP {
   optional uint32 num_zaxis_harvest_traces = 22;
 }
 
-message ALSLocation {
-  int64 latitude = 1;
-  int64 longitude = 2;
-  int32 accuracy = 3;
-  optional int32 location_type = 4;
-  optional int32 altitude = 5;
-  optional int32 vertical_accuracy = 6;
-  optional int32 confidence = 7;
+message CdmaCellTower {
+  optional int32 mcc = 1;
 
-  optional uint32 score = 11;
-  optional int32 reach = 12;
-  optional uint32 info_mask = 13;
+  optional int32 sid = 3;
+  optional int32 nid = 4;
+  optional int32 bsid = 5;
+  optional ALSLocation location = 6;
+  optional int32 zoneid = 7;
+  optional int32 bandclass = 8;
+  optional int32 channel = 9;
+  optional int32 pnoffset = 10;
 }
 
-// TBD
-message CdmaCellTower {}
-message CdmaEvdoTower {}
-message LteCellTower {}
-message ScdmaCellTower {}
-message Nr5GCellTower {}
+message CdmaEvdoTower {
+  string sectorid = 1;
+  optional int32 bandclass = 2;
+  optional int32 channel = 3;
+  optional int32 pnoffset = 4;
+  optional ALSLocation location = 5;
+}
+
+message LteCellTower {
+  optional int32 mcc = 1;
+  optional int32 mnc = 2;
+  optional int32 cell_id = 3;
+  optional int32 tac_id = 4;
+  optional ALSLocation location = 5;
+  optional int32 uarfcn = 6;
+  optional int32 pid = 7;
+}
+
+message ScdmaCellTower {
+  int32 mcc = 1;
+  int32 mnc = 2;
+  int32 cell_id = 3;
+  int32 lac_id = 4;
+  optional ALSLocation location = 5;
+
+  optional int32 arfcn = 11;
+  optional int32 psc = 12;
+}
+
+message Nr5GCellTower {
+  optional int32 mcc = 1;
+  optional int32 mnc = 2;
+  optional int32 cell_id = 3;
+  optional int32 tac_id = 4;
+  optional ALSLocation location = 5;
+  optional int32 nrarfcn = 6;
+}
