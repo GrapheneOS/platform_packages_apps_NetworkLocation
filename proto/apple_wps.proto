@@ -49,6 +49,17 @@ message ALSLocationRequestResponse {
   }
 }
 
+message CellTower {
+  int32 mcc = 1;
+  int32 mnc = 2;
+  int32 cell_id = 3;
+  int32 lac_id = 4;
+  optional ALSLocation location = 5;
+
+  optional int32 arcfn = 11;
+  optional int32 psc = 12;
+}
+
 message WirelessAP {
   string mac_id = 1;
   optional ALSLocation location = 2;
@@ -72,7 +83,6 @@ message ALSLocation {
 }
 
 // TBD
-message CellTower {}
 message CdmaCellTower {}
 message CdmaEvdoTower {}
 message LteCellTower {}
