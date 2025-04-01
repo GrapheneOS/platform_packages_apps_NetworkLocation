@@ -5,30 +5,31 @@ package app.grapheneos.networklocation.proto;
 option java_outer_classname = "AppleWpsProtos";
 
 message ALSLocationRequestResponse {
-  // cellular
   repeated CellTower cell_towers = 1;
-  repeated CdmaCellTower cdma_cell_towers = 6;
-  repeated CdmaEvdoTower cdma_evdo_towers = 7;
-  repeated LteCellTower lte_cell_towers = 10;
-  repeated ScdmaCellTower scdma_cell_towers = 12;
-  repeated Nr5GCellTower nr5g_cell_towers = 14;
-
-  // wireless
   repeated WirelessAP wireless_aps = 2;
-  repeated WifiBand surrounding_wifi_bands = 31; // offset -15
-  optional WifiAltitudeScale wifi_altitude_scale = 32; // offset -15
-
   optional int32 number_of_surrounding_cells = 3;
   optional int32 number_of_surrounding_wifis = 4;
-  optional int32 number_of_surrounding_cdma_cells = 8;
-  optional int32 number_of_surrounding_cdma_evdo_cells = 9;
-  optional int32 number_of_surrounding_lte_cells = 11;
-  optional int32 number_of_surrounding_scdma_cells = 13;
-  optional int32 number_of_surrounding_nr5g_cells = 15;
 
-  // meta
   optional string app_bundle_id = 5;
-  optional ALSMeta meta = 33; // offset -15
+
+  repeated CdmaCellTower cdma_cell_towers = 21;
+  repeated CdmaEvdoTower cdma_evdo_towers = 22;
+  optional int32 number_of_surrounding_cdma_cells = 23;
+  optional int32 number_of_surrounding_cdma_evdo_cells = 24;
+
+  repeated LteCellTower lte_cell_towers = 25;
+  optional int32 number_of_surrounding_lte_cells = 26;
+
+  repeated ScdmaCellTower scdma_cell_towers = 27;
+  optional int32 number_of_surrounding_scdma_cells = 28;
+
+  repeated Nr5GCellTower nr5g_cell_towers = 29;
+  optional int32 number_of_surrounding_nr5g_cells = 30;
+
+  repeated WifiBand surrounding_wifi_bands = 31;
+  optional WifiAltitudeScale wifi_altitude_scale = 32;
+
+  optional ALSMeta meta = 33;
 
   message ALSMeta {
     optional string software_build = 1;
@@ -51,8 +52,9 @@ message ALSLocationRequestResponse {
 message WirelessAP {
   string mac_id = 1;
   optional ALSLocation location = 2;
-  optional uint32 channel = 3;
-  optional uint32 num_zaxis_harvest_traces = 4;
+
+  optional uint32 channel = 21;
+  optional uint32 num_zaxis_harvest_traces = 22;
 }
 
 message ALSLocation {
@@ -63,9 +65,10 @@ message ALSLocation {
   optional int32 altitude = 5;
   optional int32 vertical_accuracy = 6;
   optional int32 confidence = 7;
-  optional uint32 score = 8;
-  optional int32 reach = 9;
-  optional uint32 info_mask = 10;
+
+  optional uint32 score = 11;
+  optional int32 reach = 12;
+  optional uint32 info_mask = 13;
 }
 
 // TBD
