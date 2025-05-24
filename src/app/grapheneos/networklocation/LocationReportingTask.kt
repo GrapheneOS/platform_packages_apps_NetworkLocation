@@ -1,4 +1,4 @@
-package app.grapheneos.networklocation.wifi
+package app.grapheneos.networklocation
 
 import android.location.Location
 import android.location.LocationManager
@@ -7,17 +7,18 @@ import android.location.provider.ProviderRequest
 import android.net.wifi.ScanResult
 import android.os.SystemClock
 import android.util.Log
-import app.grapheneos.networklocation.GeoPoint
-import app.grapheneos.networklocation.Point
-import app.grapheneos.networklocation.enuPointToGeoPoint
-import app.grapheneos.networklocation.geoPointToEnuPoint
 import app.grapheneos.networklocation.interop.position_estimation.Coordinate
 import app.grapheneos.networklocation.interop.position_estimation.Measurement
 import app.grapheneos.networklocation.interop.position_estimation.Position
 import app.grapheneos.networklocation.interop.position_estimation.PositionEstimation
-import app.grapheneos.networklocation.median
-import app.grapheneos.networklocation.rssiToDistance
-import app.grapheneos.networklocation.verboseLog
+import app.grapheneos.networklocation.wifi.Bssid
+import app.grapheneos.networklocation.wifi.PositioningData
+import app.grapheneos.networklocation.wifi.WifiApPositioningData
+import app.grapheneos.networklocation.wifi.WifiApRanger
+import app.grapheneos.networklocation.wifi.WifiApScanner
+import app.grapheneos.networklocation.wifi.WifiPositioningServiceCache
+import app.grapheneos.networklocation.wifi.WifiScanFailedException
+import app.grapheneos.networklocation.wifi.WifiScannerUnavailableException
 import java.io.IOException
 import kotlin.math.max
 import kotlin.math.pow

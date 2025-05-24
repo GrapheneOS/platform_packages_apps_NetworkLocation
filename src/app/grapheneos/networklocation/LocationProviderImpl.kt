@@ -9,7 +9,6 @@ import android.location.provider.ProviderRequest
 import android.os.Bundle
 import android.util.Log
 import app.grapheneos.networklocation.wifi.AppleWifiPositioningService
-import app.grapheneos.networklocation.wifi.LocationReportingTask
 import app.grapheneos.networklocation.wifi.WifiApRanger
 import app.grapheneos.networklocation.wifi.WifiApScanner
 import app.grapheneos.networklocation.wifi.WifiPositioningServiceCache
