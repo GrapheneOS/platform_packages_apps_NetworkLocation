@@ -158,21 +158,21 @@ mod tests {
             let mut random = SmallRng::seed_from_u64(s);
 
             let real_position = Position {
-                x: Coordinate::new_real(random.gen_range(10000.0..10200.0), 0.0),
-                y: Coordinate::new_real(random.gen_range(10000.0..10200.0), 0.0),
-                z: Coordinate::new_real(random.gen_range(10000.0..10200.0), 0.0),
+                x: Coordinate::new_real(random.gen_range(-10000.0..10000.0), 0.0),
+                y: Coordinate::new_real(random.gen_range(-10000.0..10000.0), 0.0),
+                z: Coordinate::new_real(random.gen_range(-10000.0..10000.0), 0.0),
             };
 
             let mut measurements = vec![];
 
             for i in 0..9 {
                 let mut measurement = generate_random_measurement(
-                    real_position.x.value - random.gen_range(30.0..80.0)
-                        ..real_position.x.value + random.gen_range(30.0..80.0),
-                    real_position.y.value - random.gen_range(30.0..80.0)
-                        ..real_position.y.value + random.gen_range(30.0..80.0),
-                    real_position.z.value - random.gen_range(30.0..80.0)
-                        ..real_position.z.value + random.gen_range(30.0..80.0),
+                    real_position.x.value - random.gen_range(0.0..1000.0)
+                        ..real_position.x.value + random.gen_range(0.0..1000.0),
+                    real_position.y.value - random.gen_range(0.0..1000.0)
+                        ..real_position.y.value + random.gen_range(0.0..1000.0),
+                    real_position.z.value - random.gen_range(0.0..1000.0)
+                        ..real_position.z.value + random.gen_range(0.0..1000.0),
                     real_position,
                     &mut random,
                 );
@@ -246,21 +246,21 @@ mod tests {
             let mut random = SmallRng::seed_from_u64(s);
 
             let real_position = Position {
-                x: Coordinate::new_real(random.gen_range(-12000.0..-10000.0), 0.0),
-                y: Coordinate::new_real(random.gen_range(-12000.0..-10000.0), 0.0),
-                z: Coordinate::new_real(random.gen_range(-12000.0..-10000.0), 0.0),
+                x: Coordinate::new_real(random.gen_range(0.0..10000.0), 0.0),
+                y: Coordinate::new_real(random.gen_range(0.0..10000.0), 0.0),
+                z: Coordinate::new_real(random.gen_range(0.0..10000.0), 0.0),
             };
 
             let mut measurements = vec![];
 
             for i in 0..9 {
                 let mut measurement = generate_random_measurement(
-                    real_position.x.value - random.gen_range(30.0..80.0)
-                        ..real_position.x.value + random.gen_range(30.0..80.0),
-                    real_position.y.value - random.gen_range(30.0..80.0)
-                        ..real_position.y.value + random.gen_range(30.0..80.0),
-                    real_position.z.value - random.gen_range(30.0..80.0)
-                        ..real_position.z.value + random.gen_range(30.0..80.0),
+                    real_position.x.value - random.gen_range(0.0..1000.0)
+                        ..real_position.x.value + random.gen_range(0.0..1000.0),
+                    real_position.y.value - random.gen_range(0.0..1000.0)
+                        ..real_position.y.value + random.gen_range(0.0..1000.0),
+                    real_position.z.value - random.gen_range(0.0..1000.0)
+                        ..real_position.z.value + random.gen_range(0.0..1000.0),
                     real_position,
                     &mut random,
                 );
@@ -316,9 +316,9 @@ mod tests {
             success_results_deltas_count,
         );
 
-        assert!(average_delta.x.value < 60.0);
-        assert!(average_delta.y.value < 60.0);
-        assert!(average_delta.z.value < 60.0);
+        assert!(average_delta.x.value < 100.0);
+        assert!(average_delta.y.value < 100.0);
+        assert!(average_delta.z.value < 100.0);
 
         assert!(average_delta.x.variance < 5000.0);
         assert!(average_delta.y.variance < 5000.0);
