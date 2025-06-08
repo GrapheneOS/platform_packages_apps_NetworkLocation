@@ -266,7 +266,7 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
         measurements_converted.push(measurement);
     }
 
-    let estimated_position = estimate_position(&mut measurements_converted);
+    let estimated_position = estimate_position(&measurements_converted);
 
     match estimated_position {
         Some(estimated_position) => {

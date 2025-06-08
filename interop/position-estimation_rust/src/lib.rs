@@ -24,7 +24,7 @@ pub struct EstimatedPosition {
 /**
  * Estimate a position using robust methods.
  */
-pub fn estimate_position(measurements: &mut [Measurement]) -> Option<EstimatedPosition> {
+pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPosition> {
     if measurements.is_empty() {
         return None;
     }
@@ -188,7 +188,7 @@ mod tests {
                 measurements.push(measurement);
             }
 
-            let estimated_position = estimate_position(&mut measurements);
+            let estimated_position = estimate_position(&measurements);
 
             results.push((real_position, estimated_position));
         }
@@ -276,7 +276,7 @@ mod tests {
                 measurements.push(measurement);
             }
 
-            let estimated_position = estimate_position(&mut measurements);
+            let estimated_position = estimate_position(&measurements);
 
             results.push((real_position, estimated_position));
         }
