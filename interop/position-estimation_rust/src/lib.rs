@@ -70,6 +70,10 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
 
         candidate_inliers_indices.clear();
         for index in 0..measurements.len() {
+            if candidate_inliers_indices.len() + (measurements.len() - index) <= best_inliers_indices.len() {
+                break;
+            }
+
             let measurement = &measurements[index];
             let dx = candidate_position.x.value - measurement.position.x.value;
             let dy = candidate_position.y.value - measurement.position.y.value;
