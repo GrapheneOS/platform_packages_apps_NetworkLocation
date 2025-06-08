@@ -81,10 +81,11 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
 
             let estimated_distance = (dx.powi(2) + dy.powi(2) + dz.powi(2)).sqrt();
             let residual = (estimated_distance - measurement.distance).abs();
-            let total_variance = measurement.position.x.variance
+            let standard_deviation = (measurement.position.x.variance
                 + measurement.position.y.variance
-                + measurement.position.z.variance;
-            let standardized_residual = residual / total_variance.sqrt();
+                + measurement.position.z.variance)
+                .sqrt();
+            let standardized_residual = residual / standard_deviation;
             // within 2 standard deviations
             let threshold = 2.0;
 
