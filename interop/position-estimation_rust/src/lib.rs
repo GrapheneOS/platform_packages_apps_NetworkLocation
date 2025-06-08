@@ -33,38 +33,47 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
 
     // only applies to measurements used for combos, all measurements
     // are still used when checking for inliers
-    let max_measurements_for_combos = 10;
-
-    let min_inliers = measurements.len().min(4);
-
-    let mut best_inlier_indices: Vec<usize> = vec![];
-    let mut best_result: Option<Position> = None;
+    let max_measurements_for_combos = measurements.len().min(10);
 
     let sample_size = measurements.len().min(4);
+    let min_inliers = measurements.len().min(4);
+    let mut candidate_inliers_indices = Vec::with_capacity(measurements.len());
 
-    let combos: Vec<Measurement> = measurements
+    let mut best_inliers_indices = Vec::with_capacity(measurements.len());
+    let mut best_position: Option<Position> = None;
+
+    let mut measurements_indices: Vec<usize> = (0..measurements.len()).collect();
+    measurements_indices = measurements_indices
         .iter()
-        .sorted_by(|m1, m2| m1.distance.total_cmp(&m2.distance))
+        .sorted_by(|m1, m2| {
+            measurements[**m1]
+                .distance
+                .total_cmp(&measurements[**m2].distance)
+        })
         .take(max_measurements_for_combos)
         .cloned()
         .collect();
+    let top_closest_measurements_indices = &measurements_indices[0..max_measurements_for_combos];
 
-    for sample in combos.iter().combinations(sample_size) {
+    for combo in top_closest_measurements_indices.iter().combinations(sample_size) {
+        let mut sample: Vec<Measurement> =
+            combo.iter().map(|index| measurements[**index]).collect();
+
         let initial_guess = Position::average(sample.iter().map(|m| m.position));
 
-        let mut sample: Vec<Measurement> = sample.iter().map(|m| *(*m)).collect();
-        let result = multilateration(
+        let candidate_position = multilateration(
             &mut random,
             &mut sample,
             Some(initial_guess),
             (sample_size * 100).min(1000),
         );
 
-        let mut candidate_inliers = vec![];
-        for (index, measurement) in measurements.iter().enumerate() {
-            let dx = result.x.value - measurement.position.x.value;
-            let dy = result.y.value - measurement.position.y.value;
-            let dz = result.z.value - measurement.position.z.value;
+        candidate_inliers_indices.clear();
+        for index in 0..measurements.len() {
+            let measurement = &measurements[index];
+            let dx = candidate_position.x.value - measurement.position.x.value;
+            let dy = candidate_position.y.value - measurement.position.y.value;
+            let dz = candidate_position.z.value - measurement.position.z.value;
 
             let estimated_distance = (dx.powi(2) + dy.powi(2) + dz.powi(2)).sqrt();
             let residual = (estimated_distance - measurement.distance).abs();
@@ -76,27 +85,32 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
             let threshold = 2.0;
 
             if standardized_residual <= threshold {
-                candidate_inliers.push(index);
+                candidate_inliers_indices.push(index);
             }
         }
 
-        if candidate_inliers.len() >= min_inliers
-            && candidate_inliers.len() > best_inlier_indices.len()
+        if candidate_inliers_indices.len() >= min_inliers
+            && candidate_inliers_indices.len() > best_inliers_indices.len()
         {
-            best_inlier_indices = candidate_inliers;
-            best_result = Some(result);
+            best_inliers_indices = candidate_inliers_indices.clone();
+            best_position = Some(candidate_position);
         }
     }
 
-    if let Some(best_result) = best_result {
-        let mut best_inliers: Vec<Measurement> = best_inlier_indices
+    if let Some(best_position) = best_position {
+        let mut best_inliers: Vec<Measurement> = best_inliers_indices
             .iter()
-            .map(|i| measurements[*i])
+            .map(|&i| measurements[i])
             .collect();
         let best_inliers_size = best_inliers.len();
 
         Some(EstimatedPosition {
-            position: multilateration(&mut random, &mut best_inliers, Some(best_result), 10_000),
+            position: multilateration(
+                &mut random,
+                &mut best_inliers,
+                Some(best_position),
+                10_000,
+            ),
             inliers_size: best_inliers_size,
         })
     } else {
