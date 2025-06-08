@@ -99,6 +99,10 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
         {
             best_inliers_indices = candidate_inliers_indices.clone();
             best_position = Some(candidate_position);
+
+            if best_inliers_indices.len() == measurements.len() {
+                break;
+            }
         }
     }
 
