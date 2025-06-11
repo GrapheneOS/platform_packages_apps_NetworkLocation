@@ -1,6 +1,5 @@
 package app.grapheneos.networklocation.wifi
 
-import android.os.SystemClock
 import android.util.Log
 import app.grapheneos.networklocation.ApplePositioningService
 import app.grapheneos.networklocation.Throttle
@@ -11,7 +10,6 @@ import app.grapheneos.networklocation.proto.AppleWpsProtos.WirelessAP
 import app.grapheneos.networklocation.verboseLog
 import java.io.IOException
 import kotlin.math.max
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 private const val TAG = "AppleWps"
@@ -20,13 +18,12 @@ private const val EXTRA_VERBOSE_TAG = "AppleWpsVV"
 private const val MAX_REQUEST_NETWORKS = 40
 private const val THROTTLED_ADDITIONAL_RESULTS = 8
 private const val MAX_ADDITIONAL_RESULTS = 100
-private val THROTTLE_COOLDOWN = 10.seconds
 private const val THROTTLE_TRIGGER_RESULT_COUNT = 17
 
 class AppleWifiPositioningService : WifiPositioningService {
     private val applePs = ApplePositioningService()
 
-    private var throttleTriggeredElapsedRealtime = -THROTTLE_COOLDOWN
+    private var throttle = Throttle(10.seconds)
 
     @Throws(IOException::class)
     override fun fetchNearbyApPositioningData(bssids: List<String>): List<WifiApPositioningData> {
@@ -35,16 +32,16 @@ class AppleWifiPositioningService : WifiPositioningService {
 
         val response = fetchInner(
             requestBssids,
-            if (SystemClock.elapsedRealtime().milliseconds - throttleTriggeredElapsedRealtime >= THROTTLE_COOLDOWN) {
-                MAX_ADDITIONAL_RESULTS
-            } else {
+            if (throttle.isThrottled()) {
                 THROTTLED_ADDITIONAL_RESULTS
+            } else {
+                MAX_ADDITIONAL_RESULTS
             }
         )
 
         if (response.wirelessApsCount >= THROTTLE_TRIGGER_RESULT_COUNT) {
             verboseLog(TAG) { "response AP count (${response.wirelessApsCount}) triggered throttle" }
-            throttleTriggeredElapsedRealtime = SystemClock.elapsedRealtime().milliseconds
+            throttle.trigger()
         }
 
         for (ap in response.wirelessApsList) {
