@@ -2,6 +2,7 @@ package app.grapheneos.networklocation.wifi
 
 import android.util.Log
 import app.grapheneos.networklocation.ApplePositioningService
+import app.grapheneos.networklocation.PositioningData
 import app.grapheneos.networklocation.Throttle
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocation
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationRequest

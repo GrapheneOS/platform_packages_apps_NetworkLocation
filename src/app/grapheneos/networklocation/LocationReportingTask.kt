@@ -12,7 +12,6 @@ import app.grapheneos.networklocation.interop.position_estimation.Measurement
 import app.grapheneos.networklocation.interop.position_estimation.Position
 import app.grapheneos.networklocation.interop.position_estimation.PositionEstimation
 import app.grapheneos.networklocation.wifi.Bssid
-import app.grapheneos.networklocation.wifi.PositioningData
 import app.grapheneos.networklocation.wifi.WifiApPositioningData
 import app.grapheneos.networklocation.wifi.WifiApRanger
 import app.grapheneos.networklocation.wifi.WifiApScanner

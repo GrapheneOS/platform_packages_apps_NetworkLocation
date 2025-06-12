@@ -1,5 +1,6 @@
 package app.grapheneos.networklocation.wifi
 
+import app.grapheneos.networklocation.PositioningData
 import java.io.IOException
 
 interface WifiPositioningService {
@@ -14,29 +15,5 @@ class WifiApPositioningData(
     override fun toString(): String {
         val pd = positioningData
         return if (pd == null) "$bssid (no positioning data)" else "${bssid}_$pd"
-    }
-}
-
-class PositioningData(
-    val latitude: Double,
-    val longitude: Double,
-    val accuracyMeters: Int,
-    val altitudeMeters: Int?,
-    val verticalAccuracyMeters: Int?,
-) {
-    override fun toString(): String {
-        return StringBuilder().run {
-            append('{'); append(latitude); append(','); append(longitude)
-            append('±'); append(accuracyMeters); append('m')
-            if (altitudeMeters != null) {
-                append(" altitude:"); append(altitudeMeters)
-                if (verticalAccuracyMeters != null) {
-                    append('±'); append(verticalAccuracyMeters)
-                }
-                append('m')
-            }
-            append('}')
-            toString()
-        }
     }
 }
