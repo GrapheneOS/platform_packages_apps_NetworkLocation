@@ -4,6 +4,7 @@ import android.annotation.ElapsedRealtimeLong
 import android.os.SystemClock
 import android.util.Log
 import android.util.LruCache
+import app.grapheneos.networklocation.PositioningData
 import com.android.internal.annotations.GuardedBy
 import com.android.internal.os.BackgroundThread
 import java.io.IOException
