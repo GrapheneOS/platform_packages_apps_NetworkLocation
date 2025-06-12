@@ -23,7 +23,7 @@ private const val TAG = "LocationProviderImpl"
 
 // Reuse cache across NetworkLocationProvider instances to reduce latency and network usage. Note
 // that the cache is periodically cleaned up to prevent recording long location history, see
-// WifiPositioningServiceCache.scheduleClean()
+// TimedLruCache.scheduleClean()
 private val wifiPositioningServiceCache by lazy {
     WifiPositioningServiceCache(AppleWifiPositioningService())
 }
