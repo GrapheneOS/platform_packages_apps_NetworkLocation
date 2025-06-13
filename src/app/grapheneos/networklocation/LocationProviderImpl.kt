@@ -8,6 +8,9 @@ import android.location.provider.ProviderProperties
 import android.location.provider.ProviderRequest
 import android.os.Bundle
 import android.util.Log
+import app.grapheneos.networklocation.cell.AppleCellPositioningService
+import app.grapheneos.networklocation.cell.CellPositioningServiceCache
+import app.grapheneos.networklocation.cell.CellTowerScanner
 import app.grapheneos.networklocation.wifi.AppleWifiPositioningService
 import app.grapheneos.networklocation.wifi.WifiApRanger
 import app.grapheneos.networklocation.wifi.WifiApScanner
@@ -21,11 +24,14 @@ import kotlinx.coroutines.runBlocking
 
 private const val TAG = "LocationProviderImpl"
 
-// Reuse cache across NetworkLocationProvider instances to reduce latency and network usage. Note
-// that the cache is periodically cleaned up to prevent recording long location history, see
+// Reuse caches across NetworkLocationProvider instances to reduce latency and network usage. Note
+// that the caches are periodically cleaned up to prevent recording long location history, see
 // TimedLruCache.scheduleClean()
 private val wifiPositioningServiceCache by lazy {
     WifiPositioningServiceCache(AppleWifiPositioningService())
+}
+private val cellPositioningServiceCache by lazy {
+    CellPositioningServiceCache(AppleCellPositioningService())
 }
 
 class LocationProviderImpl(private val context: Context)
@@ -58,6 +64,8 @@ class LocationProviderImpl(private val context: Context)
                 WifiApScanner(context),
                 WifiApRanger(context),
                 wifiPositioningServiceCache,
+                CellTowerScanner(context),
+                cellPositioningServiceCache,
             )
             locationReportingJob = CoroutineScope(Dispatchers.IO).launch {
                 task.run()
