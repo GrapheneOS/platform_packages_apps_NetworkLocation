@@ -13,6 +13,8 @@ import android.telephony.CellIdentityWcdma
 import android.telephony.CellInfo
 import android.util.Log
 import app.grapheneos.networklocation.cell.CellPositioningServiceCache
+import app.grapheneos.networklocation.cell.CellScanFailedException
+import app.grapheneos.networklocation.cell.CellScannerUnavailableException
 import app.grapheneos.networklocation.cell.CellTowerPositioningData
 import app.grapheneos.networklocation.cell.CellTowerScanner
 import app.grapheneos.networklocation.cell.Identifier
@@ -73,14 +75,36 @@ class LocationReportingTask(
                 is WifiScannerUnavailableException, is WifiScanFailedException -> {
                     // stack trace is intentionally omitted, it doesn't contain useful info
                     Log.d(TAG, e.toString())
+                    null
+                }
+
+                else -> throw e
+            }
+        }
+        if (scanResults != null) {
+            val location = estimateLocationWifi(scanResults)
+            verboseLog(TAG) { "estimateLocationWifi returned $location" }
+            if (location != null) {
+                provider.reportLocation(location)
+                return
+            }
+        }
+        verboseLog(TAG) { "falling back to cell-tower-based location" }
+        val cellInfos = try {
+            cellScanner.scan(request.workSource)
+        } catch (e: Exception) {
+            when (e) {
+                is CellScannerUnavailableException, is CellScanFailedException -> {
+                    // stack trace is intentionally omitted, it doesn't contain useful info
+                    Log.d(TAG, e.toString())
                     return
                 }
 
                 else -> throw e
             }
         }
-        val location = estimateLocationWifi(scanResults)
-        verboseLog(TAG) { "estimateLocation returned $location" }
+        val location = estimateLocationCell(cellInfos)
+        verboseLog(TAG) { "estimateLocationCell returned $location" }
         if (location != null) {
             provider.reportLocation(location)
         }
