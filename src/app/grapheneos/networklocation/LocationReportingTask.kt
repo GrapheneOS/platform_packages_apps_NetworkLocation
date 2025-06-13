@@ -7,6 +7,8 @@ import android.location.provider.ProviderRequest
 import android.net.wifi.ScanResult
 import android.os.SystemClock
 import android.util.Log
+import app.grapheneos.networklocation.cell.CellPositioningServiceCache
+import app.grapheneos.networklocation.cell.CellTowerScanner
 import app.grapheneos.networklocation.interop.position_estimation.Coordinate
 import app.grapheneos.networklocation.interop.position_estimation.Measurement
 import app.grapheneos.networklocation.interop.position_estimation.Position
@@ -31,9 +33,11 @@ private const val TAG = "LocationReportingTask"
 class LocationReportingTask(
     private val provider: LocationProviderBase,
     private val request: ProviderRequest,
-    private val scanner: WifiApScanner,
-    private val ranger: WifiApRanger,
-    private val service: WifiPositioningServiceCache,
+    private val wifiScanner: WifiApScanner,
+    private val wifiRanger: WifiApRanger,
+    private val wifiService: WifiPositioningServiceCache,
+    private val cellScanner: CellTowerScanner,
+    private val cellService: CellPositioningServiceCache,
 ) {
     suspend fun run() {
         val interval = max(1000, request.intervalMillis)
@@ -54,7 +58,7 @@ class LocationReportingTask(
 
     private suspend fun step() {
         val scanResults = try {
-            scanner.scan(request.workSource)
+            wifiScanner.scan(request.workSource)
         } catch (e: Exception) {
             when (e) {
                 is WifiScannerUnavailableException, is WifiScanFailedException -> {
@@ -94,12 +98,12 @@ class LocationReportingTask(
             val bssids = scanResults.sortedByDescending { it.level }.map { it.BSSID }
 
             // just in case the potential additional requests fail, add only cached ones
-            allPositioningData.addAll(service.getPositioningData(bssids, 0))
+            allPositioningData.addAll(wifiService.getPositioningData(bssids, 0))
 
             // don't make additional requests when we have 15 of the closest results with valid
             // positioning data already
             val onlyCachedThreshold = 15
-            val result = service.getPositioningData(bssids, onlyCachedThreshold)
+            val result = wifiService.getPositioningData(bssids, onlyCachedThreshold)
             allPositioningData.clear()
             allPositioningData.addAll(result)
         } catch (e: IOException) {
@@ -124,7 +128,7 @@ class LocationReportingTask(
             // TODO: use Wi-Fi RTT to estimate distance with RSSI as a fallback
 //            try {
 //                // TODO: maybe handle the fact that the max results this can return is 10
-//                ranger.range(bestResults.values.map { it.scanResult }, request.workSource)
+//                wifiRanger.range(bestResults.values.map { it.scanResult }, request.workSource)
 //                    .map { rangingResult ->
 //                        // TODO: handle one-sided RTT correctly
 //                        // use absolute value to counter negative distance values in cases of
