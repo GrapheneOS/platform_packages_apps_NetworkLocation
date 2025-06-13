@@ -70,7 +70,7 @@ class LocationReportingTask(
                 else -> throw e
             }
         }
-        val location = estimateLocation(scanResults)
+        val location = estimateLocationWifi(scanResults)
         verboseLog(TAG) { "estimateLocation returned $location" }
         if (location != null) {
             provider.reportLocation(location)
@@ -89,7 +89,7 @@ class LocationReportingTask(
         var estimatedDistance: EstimatedDistance?,
     )
 
-    private fun estimateLocation(scanResults: List<ScanResult>): Location? {
+    private fun estimateLocationWifi(scanResults: List<ScanResult>): Location? {
         var bestResults = HashMap<Bssid, PositionedScanResult>()
 
         val allPositioningData = mutableListOf<WifiApPositioningData>()
