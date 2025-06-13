@@ -137,7 +137,7 @@ message ScdmaCellTower {
 message Nr5GCellTower {
   optional int32 mcc = 1;
   optional int32 mnc = 2;
-  optional int32 cell_id = 3;
+  optional int64 cell_id = 3;
   optional int32 tac_id = 4;
   optional ALSLocation location = 5;
   optional int32 nrarfcn = 6;
