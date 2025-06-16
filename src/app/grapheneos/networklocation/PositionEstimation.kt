@@ -43,9 +43,8 @@ fun List<Double>.median(): Double? {
  * the vicinity of the reference point. While this approximation works reasonably well for short
  * distances, its accuracy diminishes over longer distances due to Earth’s curvature.
  *
- * TODO: Consider using a more accurate implementation in the future, which may be needed when we
- *  support using cell towers as a data point for determining location because of how much further
- *  away from the user they may be compared to Wi-Fi networks.
+ * TODO: Consider using a more accurate implementation in the future, which may be crucial if we
+ *  ever locate using longer range technology than Wi-Fi and cellular.
  */
 fun geoPointToEnuPoint(geoPoint: GeoPoint, refGeoPoint: GeoPoint): Point {
     val dLat = Math.toRadians(geoPoint.latitude - refGeoPoint.latitude)
