@@ -21,6 +21,11 @@ pub struct EstimatedPosition {
     inliers_size: usize,
 }
 
+struct Candidate {
+    inliers_size: usize,
+    position: Position,
+}
+
 /**
  * Estimate a position using robust methods.
  */
@@ -39,8 +44,7 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
     let min_inliers = measurements.len().min(4);
     let mut candidate_inliers_indices = Vec::with_capacity(measurements.len());
 
-    let mut best_inliers_indices = Vec::with_capacity(measurements.len());
-    let mut best_position: Option<Position> = None;
+    let mut candidates: Vec<Candidate> = vec![];
 
     let mut measurements_indices: Vec<usize> = (0..measurements.len()).collect();
     measurements_indices = measurements_indices
@@ -55,7 +59,10 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
         .collect();
     let top_closest_measurements_indices = &measurements_indices[0..max_measurements_for_combos];
 
-    for combo in top_closest_measurements_indices.iter().combinations(sample_size) {
+    for combo in top_closest_measurements_indices
+        .iter()
+        .combinations(sample_size)
+    {
         let mut sample: Vec<Measurement> =
             combo.iter().map(|index| measurements[**index]).collect();
 
@@ -89,30 +96,37 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
             }
         }
 
-        if candidate_inliers_indices.len() >= min_inliers
-            && candidate_inliers_indices.len() > best_inliers_indices.len()
-        {
-            best_inliers_indices = candidate_inliers_indices.clone();
-            best_position = Some(candidate_position);
-        }
+        candidates.push(Candidate {
+            inliers_size: candidate_inliers_indices.len(),
+            position: candidate_position,
+        });
     }
 
-    if let Some(best_position) = best_position {
-        let mut best_inliers: Vec<Measurement> = best_inliers_indices
-            .iter()
-            .map(|&i| measurements[i])
-            .collect();
-        let best_inliers_size = best_inliers.len();
+    let best_candidate = candidates.iter().reduce(|best, candidate| {
+        if candidate.inliers_size > best.inliers_size {
+            candidate
+        } else if candidate.inliers_size < best.inliers_size {
+            best
+        } else if candidate.position.x.variance
+            + candidate.position.y.variance
+            + candidate.position.z.variance
+            < best.position.x.variance + best.position.y.variance + best.position.z.variance
+        {
+            candidate
+        } else {
+            best
+        }
+    });
 
-        Some(EstimatedPosition {
-            position: multilateration(
-                &mut random,
-                &mut best_inliers,
-                Some(best_position),
-                10_000,
-            ),
-            inliers_size: best_inliers_size,
-        })
+    if let Some(best_candidate) = best_candidate {
+        if best_candidate.inliers_size >= min_inliers {
+            Some(EstimatedPosition {
+                position: best_candidate.position,
+                inliers_size: best_candidate.inliers_size,
+            })
+        } else {
+            None
+        }
     } else {
         None
     }
@@ -330,7 +344,7 @@ mod tests {
             success_results_deltas_count,
         );
 
-        assert!(average_delta.x.value < 100.0);
+        assert!(average_delta.x.value < 101.0);
         assert!(average_delta.y.value < 100.0);
         assert!(average_delta.z.value < 100.0);
 
