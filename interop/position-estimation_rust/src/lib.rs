@@ -66,7 +66,7 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
         let mut sample: Vec<Measurement> =
             combo.iter().map(|index| measurements[**index]).collect();
 
-        let initial_guess = Position::average(sample.iter().map(|m| m.position));
+        let initial_guess = Position::average(&sample.iter().map(|m| m.position).collect_vec());
 
         let candidate_position = multilateration(
             &mut random,
@@ -241,17 +241,14 @@ mod tests {
             })
         });
 
-        let successful_results_deltas = position_deltas
-            .flatten()
-            .collect::<Vec<Position>>()
-            .into_iter();
+        let successful_results_deltas = position_deltas.flatten().collect::<Vec<Position>>();
         let success_results_deltas_count = successful_results_deltas.len();
 
-        let average_delta = Position::average(successful_results_deltas);
+        let average_delta = Position::average(&successful_results_deltas);
 
         info!(
             "\nreal position: {:#?},\naverage delta: {:#?},\nratio of success: {}/{iterations}",
-            Position::average(results.iter().map(|p| p.0)),
+            Position::average(&results.iter().map(|p| p.0).collect_vec()),
             average_delta,
             success_results_deltas_count,
         );
@@ -329,17 +326,14 @@ mod tests {
             })
         });
 
-        let successful_results_deltas = position_deltas
-            .flatten()
-            .collect::<Vec<Position>>()
-            .into_iter();
+        let successful_results_deltas = position_deltas.flatten().collect::<Vec<Position>>();
         let success_results_deltas_count = successful_results_deltas.len();
 
-        let average_delta = Position::average(successful_results_deltas);
+        let average_delta = Position::average(&successful_results_deltas);
 
         info!(
             "\nreal position: {:#?},\naverage delta: {:#?},\nratio of success: {}/{iterations}",
-            Position::average(results.iter().map(|p| p.0)),
+            Position::average(&results.iter().map(|p| p.0).collect_vec()),
             average_delta,
             success_results_deltas_count,
         );
