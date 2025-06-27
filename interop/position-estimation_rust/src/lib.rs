@@ -72,6 +72,7 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
             &mut random,
             &mut sample,
             Some(initial_guess),
+            // sample size * 100 almost certainly won't scale well, but our max sample_size is 4 so it's fine for now.
             sample_size * 100,
         );
 
