@@ -200,25 +200,32 @@ class LocationReportingTask(
                 ),
                 refGeoPoint
             )
-            val xyPositionVariance =
-                positioningData.accuracyMeters.toDouble().pow(2) + estimatedDistance.variance
-            val zPositionVariance = positioningData.verticalAccuracyMeters?.toDouble()?.pow(2)
+            // sqrt and divide by 3.0 so we can spread it out over all 3 dimensions equally
+            val normalizedEstimatedDistanceStandardDeviation =
+                sqrt(estimatedDistance.variance) / 3.0
+            val xPositionVariance =
+                (positioningData.accuracyMeters.toDouble() + normalizedEstimatedDistanceStandardDeviation).pow(2)
+            val yPositionVariance =
+                (positioningData.accuracyMeters.toDouble() + normalizedEstimatedDistanceStandardDeviation).pow(2)
+            val zPositionVariance =
+                ((positioningData.verticalAccuracyMeters?.toDouble()
+                    ?: 0.0) + normalizedEstimatedDistanceStandardDeviation).pow(2)
             Measurement(
                 Position(
                     Coordinate(
                         true,
                         position.x,
-                        xyPositionVariance,
+                        xPositionVariance,
                     ),
                     Coordinate(
                         true,
                         position.y,
-                        xyPositionVariance,
+                        yPositionVariance,
                     ),
                     Coordinate(
                         position.z != null,
                         position.z ?: 0.0,
-                        zPositionVariance ?: 0.0,
+                        zPositionVariance,
                     ),
                 ),
                 estimatedDistance.distance,
