@@ -72,7 +72,7 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
             &mut random,
             &mut sample,
             Some(initial_guess),
-            (sample_size * 100).min(1000),
+            sample_size * 100,
         );
 
         candidate_inliers_indices.clear();
