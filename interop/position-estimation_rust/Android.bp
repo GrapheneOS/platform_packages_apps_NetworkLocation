@@ -3,10 +3,9 @@ rust_ffi_shared {
     crate_name: "network_location_position_estimation",
     srcs: ["src/lib.rs"],
     rustlibs: [
-        "libandroid_logger",
-        "libenv_logger",
         "libitertools",
         "libjni",
+        "liblogger",
         "liblog_rust",
         "librand"
     ],

@@ -2,13 +2,12 @@
 
 use std::ptr::null_mut;
 
-use android_logger::Config;
 use jni::{
     objects::{JClass, JObjectArray},
     sys::jobject,
     JNIEnv,
 };
-use log::debug;
+use log::{debug, LevelFilter};
 
 use crate::{
     coordinate::Coordinate, estimate_position, measurement::Measurement, position::Position,
@@ -21,13 +20,11 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
     _class: JClass,
     measurements: JObjectArray,
 ) -> jobject {
-    android_logger::init_once(
-        Config::default()
-            // TODO: remove with_max_level once android_logger 0.15.0 or newer ships,
-            // which allows delegating log filtering to liblog when the android-api-30
-            // feature is enabled
-            .with_max_level(log::LevelFilter::Info)
-            .with_tag("PositionEstimation"),
+    logger::init(
+        logger::Config::default()
+            .with_tag_on_device("PositionEstimation")
+            // level can only be adjusted from here
+            .with_max_level(LevelFilter::Info),
     );
 
     debug!("starting");
