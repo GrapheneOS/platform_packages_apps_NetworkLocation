@@ -1,5 +1,5 @@
-rust_ffi_shared {
-    name: "libnetwork_location_position_estimation_rust",
+rust_defaults {
+    name: "libnetwork_location_position_estimation_rust_defaults",
     crate_name: "network_location_position_estimation",
     srcs: ["src/lib.rs"],
     rustlibs: [
@@ -9,4 +9,15 @@ rust_ffi_shared {
         "liblog_rust",
         "librand"
     ],
+}
+
+rust_ffi_shared {
+    name: "libnetwork_location_position_estimation_rust",
+    defaults: ["libnetwork_location_position_estimation_rust_defaults"],
+}
+
+rust_test_host {
+    name: "libnetwork_location_position_estimation_rust_inline_tests",
+    defaults: ["libnetwork_location_position_estimation_rust_defaults"],
+    test_suites: ["general-tests"],
 }
