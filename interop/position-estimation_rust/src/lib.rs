@@ -176,9 +176,7 @@ mod tests {
     /// checks that position estimation fails due to not having enough inliers
     #[test]
     fn not_enough_inliers() {
-        env_logger::builder()
-            .filter_level(LevelFilter::max())
-            .init();
+        logger::init(logger::Config::default().with_max_level(LevelFilter::Trace));
 
         let mut results = vec![];
         let iterations = 100;
@@ -261,9 +259,7 @@ mod tests {
     /// as long as the majority of measurements are inliers
     #[test]
     fn majority_wins() {
-        env_logger::builder()
-            .filter_level(LevelFilter::max())
-            .init();
+        logger::init(logger::Config::default().with_max_level(LevelFilter::Trace));
 
         let mut results = vec![];
         let iterations = 100;
