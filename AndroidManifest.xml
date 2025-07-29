@@ -36,6 +36,22 @@
                 android:value="true" />
         </service>
 
+        <service
+            android:name="app.grapheneos.geocoder.GeocodeService"
+            android:directBootAware="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.android.location.service.GeocodeProvider" />
+            </intent-filter>
+
+            <meta-data
+                android:name="serviceVersion"
+                android:value="0" />
+            <meta-data
+                android:name="serviceIsMultiuser"
+                android:value="true" />
+        </service>
+
     </application>
 
 </manifest>

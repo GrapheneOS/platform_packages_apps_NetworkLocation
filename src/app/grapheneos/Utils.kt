@@ -1,4 +1,4 @@
-package app.grapheneos.networklocation
+package app.grapheneos
 
 import android.util.Log
 

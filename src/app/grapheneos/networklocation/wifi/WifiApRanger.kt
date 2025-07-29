@@ -7,7 +7,7 @@ import android.net.wifi.rtt.RangingResult
 import android.net.wifi.rtt.RangingResultCallback
 import android.net.wifi.rtt.WifiRttManager
 import android.os.WorkSource
-import app.grapheneos.networklocation.verboseLog
+import app.grapheneos.verboseLog
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException

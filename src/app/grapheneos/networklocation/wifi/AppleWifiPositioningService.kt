@@ -8,7 +8,7 @@ import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocation
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationRequest
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationResponse
 import app.grapheneos.networklocation.proto.AppleWpsProtos.WirelessAP
-import app.grapheneos.networklocation.verboseLog
+import app.grapheneos.verboseLog
 import java.io.IOException
 import kotlin.math.max
 import kotlin.time.Duration.Companion.seconds
