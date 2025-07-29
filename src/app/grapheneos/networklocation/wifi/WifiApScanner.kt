@@ -8,7 +8,7 @@ import android.net.wifi.WifiScanner.ScanListener
 import android.os.WorkSource
 import android.util.Log
 import android.util.SparseArray
-import app.grapheneos.networklocation.verboseLog
+import app.grapheneos.verboseLog
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine

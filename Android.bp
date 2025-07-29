@@ -8,8 +8,13 @@ android_app {
     privileged: true,
     platform_apis: true,
 
+    kotlincflags: ["-Xplugin=external/kotlinc/lib/kotlinx-serialization-compiler-plugin.jar"],
+
     static_libs: [
         "androidx.core_core",
+        "androidx.core_core-ktx",
+        "kotlinx_serialization_core",
+        "kotlinx_serialization_json",
         "network-location-position-estimation",
         "network-location-proto",
     ],

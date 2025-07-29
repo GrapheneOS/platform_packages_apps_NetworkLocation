@@ -15,6 +15,7 @@ import app.grapheneos.networklocation.wifi.AppleWifiPositioningService
 import app.grapheneos.networklocation.wifi.WifiApRanger
 import app.grapheneos.networklocation.wifi.WifiApScanner
 import app.grapheneos.networklocation.wifi.WifiPositioningServiceCache
+import app.grapheneos.verboseLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -74,7 +75,7 @@ class LocationProviderImpl(private val context: Context)
     }
 
     override fun onFlush(callback: OnFlushCompleteCallback) {
-        verboseLog(TAG) {"onFlush"}
+        verboseLog(TAG) { "onFlush" }
         // Location batching is not supported by this location provider. Location batching is meant to
         // be used by providers that can estimate location even when the application processor (AP)
         // is suspended.
