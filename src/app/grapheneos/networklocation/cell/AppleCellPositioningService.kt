@@ -11,7 +11,7 @@ import app.grapheneos.networklocation.proto.AppleWpsProtos.GsmCellTower
 import app.grapheneos.networklocation.proto.AppleWpsProtos.LteCellTower
 import app.grapheneos.networklocation.proto.AppleWpsProtos.Nr5GCellTower
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ScdmaCellTower
-import app.grapheneos.networklocation.verboseLog
+import app.grapheneos.verboseLog
 import java.io.IOException
 import kotlin.math.max
 import kotlin.time.Duration.Companion.seconds

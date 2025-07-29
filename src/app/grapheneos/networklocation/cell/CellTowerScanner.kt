@@ -5,7 +5,7 @@ import android.content.pm.PackageManager
 import android.os.WorkSource
 import android.telephony.CellInfo
 import android.telephony.TelephonyManager
-import app.grapheneos.networklocation.verboseLog
+import app.grapheneos.verboseLog
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume

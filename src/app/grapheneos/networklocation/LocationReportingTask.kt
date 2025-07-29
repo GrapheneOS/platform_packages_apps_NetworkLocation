@@ -30,6 +30,7 @@ import app.grapheneos.networklocation.wifi.WifiApScanner
 import app.grapheneos.networklocation.wifi.WifiPositioningServiceCache
 import app.grapheneos.networklocation.wifi.WifiScanFailedException
 import app.grapheneos.networklocation.wifi.WifiScannerUnavailableException
+import app.grapheneos.verboseLog
 import java.io.IOException
 import kotlin.math.max
 import kotlin.math.pow

@@ -10,6 +10,7 @@ import android.util.Log
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationRequest
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationRequest.ALSMeta
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationResponse
+import app.grapheneos.verboseLog
 import java.io.DataOutputStream
 import java.io.IOException
 import java.net.URL
