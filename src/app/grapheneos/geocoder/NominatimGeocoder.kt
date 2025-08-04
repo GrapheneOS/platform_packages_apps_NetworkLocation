@@ -13,6 +13,8 @@ import androidx.core.os.toPersistableBundle
 import app.grapheneos.verboseLog
 import java.io.IOException
 import java.net.URL
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.util.Locale
 import javax.net.ssl.HttpsURLConnection
 import kotlinx.serialization.SerializationException
@@ -36,7 +38,12 @@ class NominatimGeocoder : Geocoder {
         preferredLocale: Locale
     ): List<Address> {
         val urlSuffix =
-            "/search?format=geocodejson&q=$locationName&limit=$maxResults&addressdetails=1&extratags=1".let {
+            "/search?format=geocodejson&q=${
+                URLEncoder.encode(
+                    locationName,
+                    StandardCharsets.UTF_8
+                )
+            }&limit=$maxResults&addressdetails=1&extratags=1".let {
                 // add bounding box parameter if it's set for this request
                 if (lowerLeftLatitude == 0.0 && lowerLeftLongitude == 0.0 && upperRightLatitude == 0.0 && upperRightLongitude == 0.0) {
                     it
