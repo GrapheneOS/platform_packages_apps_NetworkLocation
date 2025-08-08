@@ -24,6 +24,9 @@ import org.grapheneos.tls.ModernTLSSocketFactory
 private const val TAG = "NominatimGeocoder"
 private const val EXTRA_VERBOSE_TAG = "NominatimGeocoderVV"
 
+/** Version which should get incremented when request behavior changes */
+private const val USER_AGENT_VERSION = 1
+
 class NominatimGeocoder : Geocoder {
     private val tlsSocketFactory = ModernTLSSocketFactory()
 
@@ -83,6 +86,10 @@ class NominatimGeocoder : Geocoder {
             }
             connection.requestMethod = "GET"
             connection.setRequestProperty("Accept-Language", preferredLocale.toLanguageTag())
+            connection.setRequestProperty(
+                "User-Agent",
+                "GrapheneOS geocoder $USER_AGENT_VERSION"
+            )
             connection.connectTimeout = 10_000
             connection.readTimeout = 10_000
 
