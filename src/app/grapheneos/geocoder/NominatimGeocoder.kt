@@ -156,6 +156,22 @@ class NominatimGeocoder : Geocoder {
                 address.subLocality = this.district
                 address.thoroughfare = this.street
                 address.subThoroughfare = this.houseNumber
+                val addressLine0 = StringBuilder().run {
+                    address.subThoroughfare?.let { this.append("$it ") }
+                    address.thoroughfare?.let { this.append(it) }
+                    address.subLocality?.let { this.append(", $it") }
+                    address.locality?.let { this.append(", $it") }
+                    address.subAdminArea?.let { this.append(", $it") }
+                    address.adminArea?.let { this.append(", $it") }
+                    address.postalCode?.let {
+                        if (address.adminArea == null) {
+                            this.append(",")
+                        }
+                        this.append(" $it")
+                    }
+                    address.countryName?.let { this.append(", $it") }
+                }?.removePrefix(", ")
+                addressLine0?.let { address.setAddressLine(0, it.toString()) }
             }
             address.url = extra?.remove("website")
             address.phone = extra?.remove("phone")
