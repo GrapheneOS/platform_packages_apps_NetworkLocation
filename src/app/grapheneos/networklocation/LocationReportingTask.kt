@@ -28,10 +28,13 @@ import app.grapheneos.networklocation.wifi.WifiApPositioningData
 import app.grapheneos.networklocation.wifi.WifiApRanger
 import app.grapheneos.networklocation.wifi.WifiApScanner
 import app.grapheneos.networklocation.wifi.WifiPositioningServiceCache
+import app.grapheneos.networklocation.wifi.WifiRangerFailedException
+import app.grapheneos.networklocation.wifi.WifiRangerUnavailableException
 import app.grapheneos.networklocation.wifi.WifiScanFailedException
 import app.grapheneos.networklocation.wifi.WifiScannerUnavailableException
 import app.grapheneos.verboseLog
 import java.io.IOException
+import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -163,53 +166,60 @@ class LocationReportingTask(
             return null
         }
 
-        runBlocking {
-            // TODO: use Wi-Fi RTT to estimate distance with RSSI as a fallback
-//            try {
-//                // TODO: maybe handle the fact that the max results this can return is 10
-//                wifiRanger.range(bestResults.values.map { it.scanResult }, request.workSource)
-//                    .map { rangingResult ->
-//                        // TODO: handle one-sided RTT correctly
-//                        // use absolute value to counter negative distance values in cases of
-//                        // close devices
-//                        val distanceMeters = rangingResult.distanceMm.absoluteValue / 1000.0
-//
-//                        bestResults[rangingResult.macAddress.toString()]?.estimatedDistance =
-//                            distanceMeters
-//                    }
-//            } catch (e: Exception) {
-//                when (e) {
-//                    is WifiRangerUnavailableException, is WifiRangerFailedException -> {
-//                        // stack trace is intentionally omitted, it doesn't contain useful info
-//                        Log.d(TAG, e.toString())
-//                    }
-//
-//                    else -> throw e
-//                }
-//                verboseLog(TAG) { "falling back to RSSI for estimating distance" }
-                for (result in bestResults.values) {
-                    val pathLossExponent = when (result.scanResult.band) {
-                        ScanResult.WIFI_BAND_24_GHZ -> 4.0
-                        ScanResult.WIFI_BAND_5_GHZ -> 3.75
-                        ScanResult.WIFI_BAND_6_GHZ -> 3.75
-                        else -> continue
+        // TODO: Use Wi-Fi RTT to estimate distance for APs that support it.
+        val useWifiRtt = false
+        if (useWifiRtt) {
+            runBlocking {
+                try {
+                    // TODO: Note that the max results this can return is 10.
+                    wifiRanger.range(bestResults.values.map { it.scanResult }, request.workSource)
+                        .map { rangingResult ->
+                            // TODO: Handle one-sided RTT correctly or stop using it.
+                            // use absolute value to counter negative distance values in cases of
+                            // close devices
+                            val distanceMeters = rangingResult.distanceMm.absoluteValue / 1000.0
+                            val varianceMeters = (rangingResult.distanceStdDevMm / 1000.0).pow(2.0)
+
+                            // verboseLog(TAG) { "$rangingResult, $distanceMeters, $varianceMeters" }
+
+                            bestResults[rangingResult.macAddress.toString()]?.estimatedDistance =
+                                EstimatedDistance(distanceMeters, varianceMeters)
+                        }
+                } catch (e: Exception) {
+                    when (e) {
+                        is WifiRangerUnavailableException, is WifiRangerFailedException -> {
+                            // stack trace is intentionally omitted, it doesn't contain useful info
+                            Log.d(TAG, e.toString())
+                        }
+
+                        else -> throw e
                     }
-                    val rssiAtOneMeter = when (result.scanResult.band) {
-                        ScanResult.WIFI_BAND_24_GHZ -> -20.0
-                        ScanResult.WIFI_BAND_5_GHZ -> -35.0
-                        ScanResult.WIFI_BAND_6_GHZ -> -35.0
-                        else -> continue
-                    }
-                    result.estimatedDistance = EstimatedDistance(
-                        rssiToDistance(
-                            result.scanResult.level.toDouble(),
-                            pathLossExponent,
-                            rssiAtOneMeter,
-                        ),
-                        max(0.0, rssiAtOneMeter - result.scanResult.level.toDouble()).pow(2)
-                    )
                 }
-//            }
+            }
+        }
+
+        // Only use RSSI estimation on results with non-null estimatedDistance (not set by Wi-Fi RTT).
+        for (result in bestResults.values.filter { it.estimatedDistance == null }) {
+            val pathLossExponent = when (result.scanResult.band) {
+                ScanResult.WIFI_BAND_24_GHZ -> 4.0
+                ScanResult.WIFI_BAND_5_GHZ -> 3.75
+                ScanResult.WIFI_BAND_6_GHZ -> 3.75
+                else -> continue
+            }
+            val rssiAtOneMeter = when (result.scanResult.band) {
+                ScanResult.WIFI_BAND_24_GHZ -> -20.0
+                ScanResult.WIFI_BAND_5_GHZ -> -35.0
+                ScanResult.WIFI_BAND_6_GHZ -> -35.0
+                else -> continue
+            }
+            result.estimatedDistance = EstimatedDistance(
+                rssiToDistance(
+                    result.scanResult.level.toDouble(),
+                    pathLossExponent,
+                    rssiAtOneMeter,
+                ),
+                max(0.0, rssiAtOneMeter - result.scanResult.level.toDouble()).pow(2)
+            )
         }
 
         bestResults =
