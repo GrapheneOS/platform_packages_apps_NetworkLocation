@@ -15,7 +15,7 @@ pub fn multilateration(
 ) -> Position {
     let mut estimated_position = initial_guess.unwrap_or_default();
 
-    for _ in 0..iterations {
+    for iter_index in 0..iterations {
         let measurement = measurements
             .iter_mut()
             .choose(random)
@@ -43,9 +43,11 @@ pub fn multilateration(
         };
 
         // M step: adjust estimated position to fit the point to a degree based on the weight
-        let weight_x = measurement.weight;
-        let weight_y = measurement.weight;
-        let weight_z = measurement.weight;
+        let learning_rate = 1.0 - (iter_index as f64 / iterations as f64);
+
+        let weight_x = measurement.weight * learning_rate;
+        let weight_y = measurement.weight * learning_rate;
+        let weight_z = measurement.weight * learning_rate;
 
         delta_update.x.value = x_delta * weight_x;
         delta_update.y.value = y_delta * weight_y;
