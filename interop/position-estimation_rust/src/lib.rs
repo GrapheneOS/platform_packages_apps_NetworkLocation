@@ -169,7 +169,7 @@ mod tests {
                 z: Coordinate::new_real(z, z_variance),
             },
             distance,
-            probability: 0.0,
+            weight: 0.0,
         }
     }
 

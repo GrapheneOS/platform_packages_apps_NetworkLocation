@@ -77,9 +77,9 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
     let measurement_distance_field_id = env
         .get_field_id(measurement_class_path, "distance", "D")
         .expect("should be able to get measurement class' distance field id");
-    let measurement_probability_field_id = env
-        .get_field_id(measurement_class_path, "probability", "D")
-        .expect("should be able to get measurement class' probability field id");
+    let measurement_weight_field_id = env
+        .get_field_id(measurement_class_path, "weight", "D")
+        .expect("should be able to get measurement class' weight field id");
 
     for index in 0..len {
         let measurement_obj = env
@@ -244,15 +244,15 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
                 .expect("should be able to get distance from measurement")
                 .d()
                 .expect("distance should be a double"),
-            probability: env
+            weight: env
                 .get_field_unchecked(
                     &measurement_obj,
-                    measurement_probability_field_id,
+                    measurement_weight_field_id,
                     jni::signature::ReturnType::Primitive(jni::signature::Primitive::Double),
                 )
-                .expect("should be able to get probability from measurement")
+                .expect("should be able to get weight from measurement")
                 .d()
-                .expect("probability should be a double"),
+                .expect("weight should be a double"),
         };
 
         debug!(
