@@ -50,19 +50,21 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
     measurements_indices = measurements_indices
         .iter()
         .sorted_by(|m1, m2| {
-            measurements[**m1]
-                .distance
-                .total_cmp(&measurements[**m2].distance)
+            let m1 = measurements[**m1];
+            let m1_standard_deviation =
+                (m1.position.x.variance + m1.position.y.variance + m1.position.z.variance).sqrt();
+            let m2 = measurements[**m2];
+            let m2_standard_deviation =
+                (m2.position.x.variance + m2.position.y.variance + m2.position.z.variance).sqrt();
+
+            m1_standard_deviation.total_cmp(&m2_standard_deviation)
         })
         .take(max_measurements_for_combos)
         .cloned()
         .collect();
-    let top_closest_measurements_indices = &measurements_indices[0..max_measurements_for_combos];
+    let top_measurements_indices = &measurements_indices[0..max_measurements_for_combos];
 
-    for combo in top_closest_measurements_indices
-        .iter()
-        .combinations(sample_size)
-    {
+    for combo in top_measurements_indices.iter().combinations(sample_size) {
         let mut sample: Vec<Measurement> =
             combo.iter().map(|index| measurements[**index]).collect();
 
