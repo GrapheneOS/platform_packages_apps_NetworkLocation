@@ -21,7 +21,7 @@ pub fn multilateration(
             .choose(random)
             .expect("should be given at least 1 measurement");
 
-        // E step: compare difference between estimated position and measurement position and distance to get a probability
+        // E step: compare difference between estimated position and measurement position and distance to get a weight
         let mut delta_update = Position::default();
 
         let x_delta = estimated_position.x.value - measurement.position.x.value;
@@ -30,7 +30,7 @@ pub fn multilateration(
 
         let estimated_distance = (x_delta.powi(2) + y_delta.powi(2) + z_delta.powi(2)).sqrt();
 
-        measurement.probability = if (measurement.distance - estimated_distance).abs()
+        measurement.weight = if (measurement.distance - estimated_distance).abs()
             > (measurement.position.x.variance
                 + measurement.position.y.variance
                 + measurement.position.z.variance)
@@ -42,10 +42,10 @@ pub fn multilateration(
             0.0
         };
 
-        // M step: adjust estimated position to fit the point to a degree based on the probability
-        let weight_x = measurement.probability;
-        let weight_y = measurement.probability;
-        let weight_z = measurement.probability;
+        // M step: adjust estimated position to fit the point to a degree based on the weight
+        let weight_x = measurement.weight;
+        let weight_y = measurement.weight;
+        let weight_z = measurement.weight;
 
         delta_update.x.value = x_delta * weight_x;
         delta_update.y.value = y_delta * weight_y;
@@ -76,7 +76,7 @@ pub fn multilateration(
     let mut weighted_variance_z = 0.0;
 
     for measurement in measurements {
-        let weight = measurement.probability + 1.0;
+        let weight = measurement.weight + 1.0;
 
         weighted_variance_x += weight * (measurement.position.x.variance);
         weighted_variance_y += weight * (measurement.position.y.variance);

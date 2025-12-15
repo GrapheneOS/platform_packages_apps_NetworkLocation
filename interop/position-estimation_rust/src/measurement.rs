@@ -9,6 +9,6 @@ pub struct Measurement {
     pub position: Position,
     /// estimated distance away from device
     pub distance: f64,
-    /// probability of measurement
-    pub probability: f64,
+    /// weight of measurement
+    pub weight: f64,
 }
