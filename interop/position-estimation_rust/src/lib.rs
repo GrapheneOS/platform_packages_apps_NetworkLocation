@@ -89,7 +89,9 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
             let standard_deviation = (measurement.position.x.variance
                 + measurement.position.y.variance
                 + measurement.position.z.variance)
-                .sqrt();
+                .sqrt()
+                // Prevent division by zero.
+                .max(f64::MIN);
             let standardized_residual = residual / standard_deviation;
             // within 2 standard deviations
             let threshold = 2.0;
