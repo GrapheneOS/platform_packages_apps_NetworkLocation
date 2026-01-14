@@ -4,8 +4,6 @@ use crate::multilateration::multilateration;
 use itertools::Itertools;
 use measurement::Measurement;
 use position::Position;
-use rand::rngs::SmallRng;
-use rand::SeedableRng;
 
 pub mod coordinate;
 mod jni;
@@ -33,8 +31,6 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
     if measurements.is_empty() {
         return None;
     }
-
-    let mut random = SmallRng::seed_from_u64(0);
 
     // only applies to measurements used for combos, all measurements
     // are still used when checking for inliers
@@ -71,7 +67,6 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
         let initial_guess = Position::average(&sample.iter().map(|m| m.position).collect_vec());
 
         let candidate_position = multilateration(
-            &mut random,
             &mut sample,
             Some(initial_guess),
             // sample size * 100 almost certainly won't scale well, but our max sample_size is 4 so it's fine for now.
@@ -140,6 +135,7 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
 #[cfg(test)]
 mod tests {
     use log::{info, LevelFilter};
+    use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};
     use std::ops::Range;
 
