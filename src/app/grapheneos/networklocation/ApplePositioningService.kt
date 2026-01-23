@@ -2,8 +2,9 @@ package app.grapheneos.networklocation
 
 import android.app.AppGlobals
 import android.content.Context
-import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_DISABLED
 import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_APPLE
+import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_APPLE_CHINA
+import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_DISABLED
 import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_GRAPHENEOS_APPLE_PROXY
 import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_SETTING
 import android.util.Log
@@ -95,6 +96,8 @@ class ApplePositioningService {
         val context: Context = AppGlobals.getInitialApplication()
         val setting = NETWORK_LOCATION_SETTING.get(context)
         return when (setting) {
+            NETWORK_LOCATION_APPLE_CHINA ->
+                Pair(URL("https://gs-loc-cn.apple.com/clls/wloc"), false)
             NETWORK_LOCATION_GRAPHENEOS_APPLE_PROXY ->
                 Pair(URL("https://gs-loc.apple.grapheneos.org/clls/wloc"), true)
             NETWORK_LOCATION_APPLE ->
