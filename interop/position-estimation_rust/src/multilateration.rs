@@ -59,9 +59,9 @@ pub fn multilateration(
 
         let mut update = Position::default();
 
-        let mut total_weighted_std_dev_x = 0.0;
-        let mut total_weighted_std_dev_y = 0.0;
-        let mut total_weighted_std_dev_z = 0.0;
+        let mut total_weighted_six_sigma_x = 0.0;
+        let mut total_weighted_six_sigma_y = 0.0;
+        let mut total_weighted_six_sigma_z = 0.0;
 
         for measurement_index in &measurements_to_work_on {
             let mut measurement = measurements[*measurement_index];
@@ -70,13 +70,13 @@ pub fn multilateration(
             let mut y_delta = estimated_position.y.value - measurement.position.y.value;
             let mut z_delta = estimated_position.z.value - measurement.position.z.value;
 
-            if x_delta.abs() <= measurement.position.x.variance.sqrt() {
+            if x_delta.abs() <= measurement.position.x.six_sigma_squared.sqrt() {
                 x_delta = 0.0
             }
-            if y_delta.abs() <= measurement.position.y.variance.sqrt() {
+            if y_delta.abs() <= measurement.position.y.six_sigma_squared.sqrt() {
                 y_delta = 0.0
             }
-            if z_delta.abs() <= measurement.position.z.variance.sqrt() {
+            if z_delta.abs() <= measurement.position.z.six_sigma_squared.sqrt() {
                 z_delta = 0.0
             }
 
@@ -91,13 +91,13 @@ pub fn multilateration(
             let is_y_real = measurement.position.y.real;
             let is_z_real = measurement.position.z.real;
 
-            let x_variance = measurement.position.x.variance;
-            let y_variance = measurement.position.y.variance;
-            let z_variance = measurement.position.z.variance;
+            let x_six_sigma_squared = measurement.position.x.six_sigma_squared;
+            let y_six_sigma_squared = measurement.position.y.six_sigma_squared;
+            let z_six_sigma_squared = measurement.position.z.six_sigma_squared;
 
-            let measurement_distance_std_dev = (measurement.position.x.variance
-                + measurement.position.y.variance
-                + measurement.position.z.variance)
+            let measurement_distance_std_dev = (measurement.position.x.six_sigma_squared
+                + measurement.position.y.six_sigma_squared
+                + measurement.position.z.six_sigma_squared)
                 .sqrt();
             measurement.weight = if (measurement.distance - estimated_distance).abs()
                 > measurement_distance_std_dev
@@ -152,13 +152,13 @@ pub fn multilateration(
                     / measurement_distance_std_dev;
                 let weight = weight.max(1.0);
                 if is_x_real {
-                    total_weighted_std_dev_x += x_variance.sqrt() * weight;
+                    total_weighted_six_sigma_x += x_six_sigma_squared.sqrt() * weight;
                 }
                 if is_y_real {
-                    total_weighted_std_dev_y += y_variance.sqrt() * weight;
+                    total_weighted_six_sigma_y += y_six_sigma_squared.sqrt() * weight;
                 }
                 if is_z_real {
-                    total_weighted_std_dev_z += z_variance.sqrt() * weight;
+                    total_weighted_six_sigma_z += z_six_sigma_squared.sqrt() * weight;
                 }
             }
         }
@@ -215,23 +215,23 @@ pub fn multilateration(
         estimated_position.z.value += update.z.value;
 
         if is_last_iter {
-            estimated_position.x.variance = if real_measurements_to_work_on_lens.0 == 0.0 {
+            estimated_position.x.six_sigma_squared = if real_measurements_to_work_on_lens.0 == 0.0 {
                 estimated_position.x.real = false;
                 0.0
             } else {
-                (total_weighted_std_dev_x / real_measurements_to_work_on_lens.0).powi(2)
+                (total_weighted_six_sigma_x / real_measurements_to_work_on_lens.0).powi(2)
             };
-            estimated_position.y.variance = if real_measurements_to_work_on_lens.1 == 0.0 {
+            estimated_position.y.six_sigma_squared = if real_measurements_to_work_on_lens.1 == 0.0 {
                 estimated_position.y.real = false;
                 0.0
             } else {
-                (total_weighted_std_dev_y / real_measurements_to_work_on_lens.1).powi(2)
+                (total_weighted_six_sigma_y / real_measurements_to_work_on_lens.1).powi(2)
             };
-            estimated_position.z.variance = if real_measurements_to_work_on_lens.2 == 0.0 {
+            estimated_position.z.six_sigma_squared = if real_measurements_to_work_on_lens.2 == 0.0 {
                 estimated_position.z.real = false;
                 0.0
             } else {
-                (total_weighted_std_dev_z / real_measurements_to_work_on_lens.2).powi(2)
+                (total_weighted_six_sigma_z / real_measurements_to_work_on_lens.2).powi(2)
             };
         }
     }

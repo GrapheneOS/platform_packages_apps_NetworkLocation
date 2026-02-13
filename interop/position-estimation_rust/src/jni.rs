@@ -70,9 +70,9 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
     let coordinate_value_field_id = env
         .get_field_id(coordinate_class_path, "value", "D")
         .expect("should be able to get coordinate class' value field id");
-    let coordinate_variance_field_id = env
-        .get_field_id(coordinate_class_path, "variance", "D")
-        .expect("should be able to get coordinate class' variance field id");
+    let coordinate_six_sigma_squared_field_id = env
+        .get_field_id(coordinate_class_path, "sixSigmaSquared", "D")
+        .expect("should be able to get coordinate class' sixSigmaSquared field id");
 
     let measurement_distance_field_id = env
         .get_field_id(measurement_class_path, "distance", "D")
@@ -152,17 +152,17 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
                         .expect("should be able to get value from x")
                         .d()
                         .expect("value should be double"),
-                    variance: env
+                    six_sigma_squared: env
                         .get_field_unchecked(
                             &x_obj,
-                            coordinate_variance_field_id,
+                            coordinate_six_sigma_squared_field_id,
                             jni::signature::ReturnType::Primitive(
                                 jni::signature::Primitive::Double,
                             ),
                         )
-                        .expect("should be able to get variance from x")
+                        .expect("should be able to get six_sigma_squared from x")
                         .d()
-                        .expect("variance should be a double"),
+                        .expect("six_sigma_squared should be a double"),
                 },
                 y: Coordinate {
                     real: env
@@ -187,17 +187,17 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
                         .expect("should be able to get value from y")
                         .d()
                         .expect("value should be double"),
-                    variance: env
+                    six_sigma_squared: env
                         .get_field_unchecked(
                             &y_obj,
-                            coordinate_variance_field_id,
+                            coordinate_six_sigma_squared_field_id,
                             jni::signature::ReturnType::Primitive(
                                 jni::signature::Primitive::Double,
                             ),
                         )
-                        .expect("should be able to get variance from y")
+                        .expect("should be able to get six_sigma_squared from y")
                         .d()
-                        .expect("variance should be a double"),
+                        .expect("six_sigma_squared should be a double"),
                 },
                 z: Coordinate {
                     real: env
@@ -222,17 +222,17 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
                         .expect("should be able to get value from z")
                         .d()
                         .expect("value should be double"),
-                    variance: env
+                    six_sigma_squared: env
                         .get_field_unchecked(
                             &z_obj,
-                            coordinate_variance_field_id,
+                            coordinate_six_sigma_squared_field_id,
                             jni::signature::ReturnType::Primitive(
                                 jni::signature::Primitive::Double,
                             ),
                         )
-                        .expect("should be able to get variance from z")
+                        .expect("should be able to get six_sigma_squared from z")
                         .d()
-                        .expect("variance should be a double"),
+                        .expect("six_sigma_squared should be a double"),
                 },
             },
             distance: env
@@ -282,7 +282,7 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
                     &[
                         position.x.real.into(),
                         position.x.value.into(),
-                        position.x.variance.into(),
+                        position.x.six_sigma_squared.into(),
                     ],
                 )
                 .expect("should be able to create new x coordinate object");
@@ -293,7 +293,7 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
                     &[
                         position.y.real.into(),
                         position.y.value.into(),
-                        position.y.variance.into(),
+                        position.y.six_sigma_squared.into(),
                     ],
                 )
                 .expect("should be able to create new y coordinate object");
@@ -304,7 +304,7 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
                     &[
                         position.z.real.into(),
                         position.z.value.into(),
-                        position.z.variance.into(),
+                        position.z.six_sigma_squared.into(),
                     ],
                 )
                 .expect("should be able to create new z coordinate object");

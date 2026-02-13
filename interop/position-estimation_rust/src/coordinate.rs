@@ -7,17 +7,17 @@ pub struct Coordinate {
     pub real: bool,
     /// coordinate value
     pub value: f64,
-    /// variance (1-sigma²)
-    pub variance: f64,
+    /// 6-sigma²
+    pub six_sigma_squared: f64,
 }
 
 impl Coordinate {
     /// new real coordinate
-    pub fn new_real(value: f64, variance: f64) -> Self {
+    pub fn new_real(value: f64, six_sigma_squared: f64) -> Self {
         Coordinate {
             real: true,
             value,
-            variance,
+            six_sigma_squared,
         }
     }
 
@@ -26,7 +26,7 @@ impl Coordinate {
         Coordinate {
             real: false,
             value: 0.0,
-            variance: 0.0,
+            six_sigma_squared: 0.0,
         }
     }
 }

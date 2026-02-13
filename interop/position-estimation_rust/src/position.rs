@@ -31,15 +31,15 @@ impl Position {
         Position {
             x: Coordinate::new_real(
                 positions.iter().map(|p| p.x.value).sum::<f64>() / positions_len,
-                positions.iter().map(|p| p.x.variance).sum::<f64>() / positions_len,
+                positions.iter().map(|p| p.x.six_sigma_squared).sum::<f64>() / positions_len,
             ),
             y: Coordinate::new_real(
                 positions.iter().map(|p| p.y.value).sum::<f64>() / positions_len,
-                positions.iter().map(|p| p.y.variance).sum::<f64>() / positions_len,
+                positions.iter().map(|p| p.y.six_sigma_squared).sum::<f64>() / positions_len,
             ),
             z: Coordinate::new_real(
                 positions.iter().map(|p| p.z.value).sum::<f64>() / positions_len,
-                positions.iter().map(|p| p.z.variance).sum::<f64>() / positions_len,
+                positions.iter().map(|p| p.z.six_sigma_squared).sum::<f64>() / positions_len,
             ),
         }
     }

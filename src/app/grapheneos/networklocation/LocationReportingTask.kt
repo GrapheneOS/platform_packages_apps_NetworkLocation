@@ -116,8 +116,8 @@ class LocationReportingTask(
 
     private class EstimatedDistance(
         var distance: Double,
-        /** variance (1-sigma²) */
-        var variance: Double,
+        /** 6-sigma² */
+        var sixSigmaSquared: Double,
     )
 
     private class PositionedScanResult(
@@ -178,12 +178,13 @@ class LocationReportingTask(
                             // use absolute value to counter negative distance values in cases of
                             // close devices
                             val distanceMeters = rangingResult.distanceMm.absoluteValue / 1000.0
-                            val varianceMeters = (rangingResult.distanceStdDevMm / 1000.0).pow(2.0)
+                            val sixSigmaSquaredMeters =
+                                rangingResult.distanceStdDevMm.div(1000.0).times(6.0).pow(2.0)
 
-                            // verboseLog(TAG) { "$rangingResult, $distanceMeters, $varianceMeters" }
+                            // verboseLog(TAG) { "$rangingResult, $distanceMeters, $sixSigmaSquaredMeters" }
 
                             bestResults[rangingResult.macAddress.toString()]?.estimatedDistance =
-                                EstimatedDistance(distanceMeters, varianceMeters)
+                                EstimatedDistance(distanceMeters, sixSigmaSquaredMeters)
                         }
                 } catch (e: Exception) {
                     when (e) {
@@ -254,15 +255,15 @@ class LocationReportingTask(
                 refGeoPoint
             )
             // sqrt and divide by 3.0 so we can spread it out over all 3 dimensions equally
-            val normalizedEstimatedDistanceStandardDeviation =
-                sqrt(estimatedDistance.variance) / 3.0
+            val normalizedEstimatedDistanceSixSigma =
+                sqrt(estimatedDistance.sixSigmaSquared) / 3.0
             val xPositionVariance =
-                (positioningData.accuracyMeters.toDouble() + normalizedEstimatedDistanceStandardDeviation).pow(2)
+                (positioningData.accuracyMeters.toDouble() + normalizedEstimatedDistanceSixSigma).pow(2)
             val yPositionVariance =
-                (positioningData.accuracyMeters.toDouble() + normalizedEstimatedDistanceStandardDeviation).pow(2)
+                (positioningData.accuracyMeters.toDouble() + normalizedEstimatedDistanceSixSigma).pow(2)
             val zPositionVariance =
                 ((positioningData.verticalAccuracyMeters?.toDouble()
-                    ?: 0.0) + normalizedEstimatedDistanceStandardDeviation).pow(2)
+                    ?: 0.0) + normalizedEstimatedDistanceSixSigma).pow(2)
             Measurement(
                 Position(
                     Coordinate(
@@ -305,10 +306,15 @@ class LocationReportingTask(
         val estimatedGeoPoint = enuPointToGeoPoint(enuPoint, refGeoPoint)
         loc.longitude = estimatedGeoPoint.longitude
         loc.latitude = estimatedGeoPoint.latitude
-        loc.accuracy = ((sqrt(result.x.variance) + sqrt(result.y.variance)) / 2.0).toFloat()
+        val accuracySixSigma =
+            (sqrt(result.x.sixSigmaSquared) + sqrt(result.y.sixSigmaSquared)) / 2.0
+        // Convert from 6-sigma to 1-sigma
+        loc.accuracy = accuracySixSigma.div(6.0).toFloat()
         estimatedGeoPoint.altitude?.let { estimatedAltitude ->
             loc.altitude = estimatedAltitude
-            loc.verticalAccuracyMeters = sqrt(result.z.variance).toFloat()
+            val verticalAccuracySixSigma = sqrt(result.z.sixSigmaSquared)
+            // Convert from 6-sigma to 1-sigma
+            loc.verticalAccuracyMeters = verticalAccuracySixSigma.div(6.0).toFloat()
         }
         return loc
     }
@@ -527,10 +533,11 @@ class LocationReportingTask(
         val estimatedGeoPoint = enuPointToGeoPoint(enuPoint, refGeoPoint)
         loc.longitude = estimatedGeoPoint.longitude
         loc.latitude = estimatedGeoPoint.latitude
-        loc.accuracy = ((sqrt(result.x.variance) + sqrt(result.y.variance)) / 2.0).toFloat()
+        loc.accuracy =
+            ((sqrt(result.x.sixSigmaSquared) + sqrt(result.y.sixSigmaSquared)) / 2.0).toFloat()
         estimatedGeoPoint.altitude?.let { estimatedAltitude ->
             loc.altitude = estimatedAltitude
-            loc.verticalAccuracyMeters = sqrt(result.z.variance).toFloat()
+            loc.verticalAccuracyMeters = sqrt(result.z.sixSigmaSquared).toFloat()
         }
         return loc
     }

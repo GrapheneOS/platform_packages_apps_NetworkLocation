@@ -49,11 +49,15 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
         .iter()
         .sorted_by(|m1, m2| {
             let m1 = measurements[**m1];
-            let m1_standard_deviation =
-                (m1.position.x.variance + m1.position.y.variance + m1.position.z.variance).sqrt();
+            let m1_standard_deviation = (m1.position.x.six_sigma_squared
+                + m1.position.y.six_sigma_squared
+                + m1.position.z.six_sigma_squared)
+                .sqrt();
             let m2 = measurements[**m2];
-            let m2_standard_deviation =
-                (m2.position.x.variance + m2.position.y.variance + m2.position.z.variance).sqrt();
+            let m2_standard_deviation = (m2.position.x.six_sigma_squared
+                + m2.position.y.six_sigma_squared
+                + m2.position.z.six_sigma_squared)
+                .sqrt();
 
             m1_standard_deviation.total_cmp(&m2_standard_deviation)
         })
@@ -78,9 +82,9 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
 
             let estimated_distance = (dx.powi(2) + dy.powi(2) + dz.powi(2)).sqrt();
             let residual = (estimated_distance - measurement.distance).abs();
-            let standard_deviation = (measurement.position.x.variance
-                + measurement.position.y.variance
-                + measurement.position.z.variance)
+            let standard_deviation = (measurement.position.x.six_sigma_squared
+                + measurement.position.y.six_sigma_squared
+                + measurement.position.z.six_sigma_squared)
                 .sqrt()
                 // Prevent division by zero.
                 .max(f64::MIN);
@@ -112,12 +116,12 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
         } else if candidate.position.number_of_real() > best.position.number_of_real()
             || (((candidate.position.is_all_real() && best.position.is_all_real())
                 || candidate.position.number_of_real() == best.position.number_of_real())
-                && candidate.position.x.variance
-                    + candidate.position.y.variance
-                    + candidate.position.z.variance
-                    < best.position.x.variance
-                        + best.position.y.variance
-                        + best.position.z.variance)
+                && candidate.position.x.six_sigma_squared
+                    + candidate.position.y.six_sigma_squared
+                    + candidate.position.z.six_sigma_squared
+                    < best.position.x.six_sigma_squared
+                        + best.position.y.six_sigma_squared
+                        + best.position.z.six_sigma_squared)
         {
             candidate
         } else {
@@ -170,9 +174,9 @@ mod tests {
         let x = random.gen_range(x_range);
         let y = random.gen_range(y_range);
         let z = random.gen_range(z_range);
-        let x_variance: f64 = random.gen_range(3000.0..5000.0);
-        let y_variance: f64 = random.gen_range(3000.0..5000.0);
-        let z_variance: f64 = random.gen_range(50.0..100.0);
+        let x_six_sigma_squared: f64 = random.gen_range(3000.0..5000.0);
+        let y_six_sigma_squared: f64 = random.gen_range(3000.0..5000.0);
+        let z_six_sigma_squared: f64 = random.gen_range(50.0..100.0);
         let distance = ((x - real_position.x.value).powi(2)
             + (y - real_position.y.value).powi(2)
             + (z - real_position.z.value).powi(2))
@@ -181,9 +185,9 @@ mod tests {
 
         Measurement {
             position: Position {
-                x: Coordinate::new_real(x, x_variance),
-                y: Coordinate::new_real(y, y_variance),
-                z: Coordinate::new_real(z, z_variance),
+                x: Coordinate::new_real(x, x_six_sigma_squared),
+                y: Coordinate::new_real(y, y_six_sigma_squared),
+                z: Coordinate::new_real(z, z_six_sigma_squared),
             },
             distance,
             weight: 0.0,
@@ -243,15 +247,15 @@ mod tests {
                 Position {
                     x: Coordinate::new_real(
                         (p.0.x.value - result.x.value).abs(),
-                        result.x.variance,
+                        result.x.six_sigma_squared,
                     ),
                     y: Coordinate::new_real(
                         (p.0.y.value - result.y.value).abs(),
-                        result.y.variance,
+                        result.y.six_sigma_squared,
                     ),
                     z: Coordinate::new_real(
                         (p.0.z.value - result.z.value).abs(),
-                        result.z.variance,
+                        result.z.six_sigma_squared,
                     ),
                 }
             })
@@ -326,15 +330,15 @@ mod tests {
                 Position {
                     x: Coordinate::new_real(
                         (p.0.x.value - result.x.value).abs(),
-                        result.x.variance,
+                        result.x.six_sigma_squared,
                     ),
                     y: Coordinate::new_real(
                         (p.0.y.value - result.y.value).abs(),
-                        result.y.variance,
+                        result.y.six_sigma_squared,
                     ),
                     z: Coordinate::new_real(
                         (p.0.z.value - result.z.value).abs(),
-                        result.z.variance,
+                        result.z.six_sigma_squared,
                     ),
                 }
             })
@@ -356,8 +360,8 @@ mod tests {
         assert!(average_delta.y.value < 100.0);
         assert!(average_delta.z.value < 100.0);
 
-        assert!(average_delta.x.variance < 5000.0);
-        assert!(average_delta.y.variance < 5000.0);
-        assert!(average_delta.z.variance < 100.0);
+        assert!(average_delta.x.six_sigma_squared < 5000.0);
+        assert!(average_delta.y.six_sigma_squared < 5000.0);
+        assert!(average_delta.z.six_sigma_squared < 100.0);
     }
 }
