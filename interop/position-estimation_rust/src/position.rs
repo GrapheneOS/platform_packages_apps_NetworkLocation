@@ -43,4 +43,14 @@ impl Position {
             ),
         }
     }
+
+    /// Whether all coordinates are real.
+    pub fn is_all_real(self) -> bool {
+        self.x.real && self.y.real && self.z.real
+    }
+
+    /// Returns the number of coordinates which are real.
+    pub fn number_of_real(self) -> u8 {
+        u8::from(self.x.real) + u8::from(self.y.real) + u8::from(self.z.real)
+    }
 }
