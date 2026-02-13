@@ -4,6 +4,6 @@ data class Coordinate(
     /** whether the value is real (not estimated based on other data) */
     var real: Boolean,
     var value: Double,
-    /** variance (1-sigma²) */
-    var variance: Double,
+    /** 6-sigma² */
+    var sixSigmaSquared: Double,
 )
