@@ -201,10 +201,10 @@ class LocationReportingTask(
 
         // Only use RSSI estimation on results with non-null estimatedDistance (not set by Wi-Fi RTT).
         for (result in bestResults.values.filter { it.estimatedDistance == null }) {
-            val pathLossExponent = when (result.scanResult.band) {
-                ScanResult.WIFI_BAND_24_GHZ -> 4.0
-                ScanResult.WIFI_BAND_5_GHZ -> 3.75
-                ScanResult.WIFI_BAND_6_GHZ -> 3.75
+            val (pathLossExponentLower, pathLossExponentHigher) = when (result.scanResult.band) {
+                ScanResult.WIFI_BAND_24_GHZ -> Pair(2.0, 7.0)
+                ScanResult.WIFI_BAND_5_GHZ -> Pair(2.0, 7.0)
+                ScanResult.WIFI_BAND_6_GHZ -> Pair(2.0, 7.0)
                 else -> continue
             }
             val rssiAtOneMeter = when (result.scanResult.band) {
@@ -213,13 +213,21 @@ class LocationReportingTask(
                 ScanResult.WIFI_BAND_6_GHZ -> -35.0
                 else -> continue
             }
+            val distanceLowerBound = rssiToDistance(
+                result.scanResult.level.toDouble(),
+                pathLossExponentHigher,
+                rssiAtOneMeter,
+            )
+            val distanceHigherBound = rssiToDistance(
+                result.scanResult.level.toDouble(),
+                pathLossExponentLower,
+                rssiAtOneMeter,
+            )
+            val distance = (distanceHigherBound + distanceLowerBound) / 2.0
+            val sixSigmaSquared = max(0.0, distance - distanceLowerBound).pow(2)
             result.estimatedDistance = EstimatedDistance(
-                rssiToDistance(
-                    result.scanResult.level.toDouble(),
-                    pathLossExponent,
-                    rssiAtOneMeter,
-                ),
-                max(0.0, rssiAtOneMeter - result.scanResult.level.toDouble()).pow(2)
+                distance,
+                sixSigmaSquared,
             )
         }
 
