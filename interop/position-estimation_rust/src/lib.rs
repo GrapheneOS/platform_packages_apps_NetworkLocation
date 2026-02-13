@@ -1,5 +1,7 @@
 //! Position estimation using robust algorithms.
 
+use std::ops::{Add, Div};
+
 use crate::multilateration::multilateration;
 use itertools::Itertools;
 use measurement::Measurement;
@@ -20,7 +22,7 @@ pub struct EstimatedPosition {
 }
 
 struct Candidate {
-    inliers_size: usize,
+    inliers_indices: Vec<usize>,
     position: Position,
 }
 
@@ -66,12 +68,7 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
 
         let initial_guess = Position::average(&sample.iter().map(|m| m.position).collect_vec());
 
-        let candidate_position = multilateration(
-            &mut sample,
-            Some(initial_guess),
-            // sample size * 100 almost certainly won't scale well, but our max sample_size is 4 so it's fine for now.
-            sample_size * 100,
-        );
+        let candidate_position = multilateration(&mut  sample, Some(initial_guess), 50);
 
         candidate_inliers_indices.clear();
         for (index, measurement) in measurements.iter().enumerate() {
@@ -97,20 +94,30 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
         }
 
         candidates.push(Candidate {
-            inliers_size: candidate_inliers_indices.len(),
+            inliers_indices: candidate_inliers_indices.clone(),
             position: candidate_position,
         });
     }
 
+    let target_inlier_count = measurements_indices.len().div(2).add(1).max(min_inliers);
     let best_candidate = candidates.iter().reduce(|best, candidate| {
-        if candidate.inliers_size > best.inliers_size {
+        let compare_inlier_count = !(candidate.inliers_indices.len() >= target_inlier_count
+            && best.inliers_indices.len() >= target_inlier_count);
+        if compare_inlier_count && candidate.inliers_indices.len() > best.inliers_indices.len() {
             candidate
-        } else if candidate.inliers_size < best.inliers_size {
+        } else if compare_inlier_count
+            && candidate.inliers_indices.len() < best.inliers_indices.len()
+        {
             best
-        } else if candidate.position.x.variance
-            + candidate.position.y.variance
-            + candidate.position.z.variance
-            < best.position.x.variance + best.position.y.variance + best.position.z.variance
+        } else if candidate.position.number_of_real() > best.position.number_of_real()
+            || (((candidate.position.is_all_real() && best.position.is_all_real())
+                || candidate.position.number_of_real() == best.position.number_of_real())
+                && candidate.position.x.variance
+                    + candidate.position.y.variance
+                    + candidate.position.z.variance
+                    < best.position.x.variance
+                        + best.position.y.variance
+                        + best.position.z.variance)
         {
             candidate
         } else {
@@ -119,10 +126,20 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
     });
 
     if let Some(best_candidate) = best_candidate {
-        if best_candidate.inliers_size >= min_inliers {
+        if best_candidate.inliers_indices.len() >= min_inliers {
+            let final_estimated_position = multilateration(
+                &mut best_candidate
+                    .inliers_indices
+                    .iter()
+                    .map(|index| measurements[*index])
+                    .collect_vec(),
+                Some(best_candidate.position),
+                1000.div(best_candidate.inliers_indices.len()).max(3),
+            );
+
             Some(EstimatedPosition {
-                position: best_candidate.position,
-                inliers_size: best_candidate.inliers_size,
+                position: final_estimated_position,
+                inliers_size: best_candidate.inliers_indices.len(),
             })
         } else {
             None
