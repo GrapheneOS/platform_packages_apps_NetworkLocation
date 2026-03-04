@@ -2,8 +2,8 @@ package app.grapheneos.geocoder
 
 import android.content.Context
 import android.ext.settings.GeocoderSettings.GEOCODER_DISABLED
-import android.ext.settings.GeocoderSettings.GEOCODER_SERVER_GRAPHENEOS_PROXY
-import android.ext.settings.GeocoderSettings.GEOCODER_SERVER_NOMINATIM
+import android.ext.settings.GeocoderSettings.GEOCODER_SERVER_GRAPHENEOS
+import android.ext.settings.GeocoderSettings.GEOCODER_SERVER_OPENSTREETMAPS
 import android.ext.settings.GeocoderSettings.GEOCODER_SETTING
 import android.location.Address
 import android.location.provider.ForwardGeocodeRequest
@@ -80,7 +80,7 @@ class GeocodeProviderImpl(private val context: Context) : GeocodeProviderBase(co
     private fun getGeocoder(): Geocoder {
         val setting = GEOCODER_SETTING.get(context)
         return when (setting) {
-            GEOCODER_SERVER_GRAPHENEOS_PROXY, GEOCODER_SERVER_NOMINATIM -> NominatimGeocoder()
+            GEOCODER_SERVER_GRAPHENEOS, GEOCODER_SERVER_OPENSTREETMAPS -> NominatimGeocoder()
 
             GEOCODER_DISABLED -> throw IOException("geocoder setting is disabled")
 
