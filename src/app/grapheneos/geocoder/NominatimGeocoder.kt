@@ -4,7 +4,7 @@ import android.app.AppGlobals
 import android.content.Context
 import android.ext.settings.GeocoderSettings.GEOCODER_DISABLED
 import android.ext.settings.GeocoderSettings.GEOCODER_SERVER_GRAPHENEOS
-import android.ext.settings.GeocoderSettings.GEOCODER_SERVER_OPENSTREETMAPS
+import android.ext.settings.GeocoderSettings.GEOCODER_SERVER_OPENSTREETMAP
 import android.ext.settings.GeocoderSettings.GEOCODER_SETTING
 import android.location.Address
 import android.os.Bundle
@@ -195,7 +195,7 @@ class NominatimGeocoder : Geocoder {
         return when (setting) {
             GEOCODER_SERVER_GRAPHENEOS -> Pair(URL("https://nominatim.grapheneos.org"), true)
 
-            GEOCODER_SERVER_OPENSTREETMAPS -> Pair(URL("https://nominatim.openstreetmap.org"), true)
+            GEOCODER_SERVER_OPENSTREETMAP -> Pair(URL("https://nominatim.openstreetmap.org"), true)
 
             GEOCODER_DISABLED ->
                 // geocoder can be disabled by the user at any point
