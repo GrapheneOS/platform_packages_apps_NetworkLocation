@@ -1,6 +1,7 @@
 //! Documentation for multilateration module.
 
 use core::f64;
+use std::ops::{Div, Sub};
 
 use crate::{measurement::Measurement, position::Position};
 use itertools::Itertools;
@@ -13,14 +14,22 @@ pub fn multilateration(
     initial_guess: Option<Position>,
     iterations: usize,
 ) -> Position {
+    // Also used for six_sigma_squared estimation iterations.
     let mut estimated_position = initial_guess.unwrap_or_default();
+    let mut actual_estimated_position = estimated_position;
+    let six_sigma_squared_estimation_iterations_per_point = 6;
+    // 2 points for each dimension.
+    let mut six_sigma_squared_estimation_points = [Position::default(); 6];
+    let six_sigma_squared_estimation_iterations = six_sigma_squared_estimation_points.len()
+        * six_sigma_squared_estimation_iterations_per_point;
+    let mut previous_estimated_position = estimated_position;
 
     let iterations_per_phase = iterations / 3;
     // Make sure we don't have any extra iterations.
-    let iterations = iterations_per_phase * 3;
+    let iterations = (iterations_per_phase * 3) + six_sigma_squared_estimation_iterations;
 
     for iter_index in 0..iterations {
-        let is_last_iter = iter_index == (iterations_per_phase * 3) - 1;
+        let is_last_phases_iter = iter_index == (iterations_per_phase * 3) - 1;
 
         let only_use_measurements_with_no_latent_variables = iter_index < iterations_per_phase;
         let only_update_position_with_fully_real_measurements =
@@ -28,9 +37,39 @@ pub fn multilateration(
         let can_use_measurement_for_position_update = |measurement: Measurement| {
             measurement.position.is_all_real() || !only_update_position_with_fully_real_measurements
         };
-        let learning_rate = iter_index as f64 / iterations_per_phase as f64;
+        let is_in_final_six_sigma_squared_estimation =
+            (iterations.sub(six_sigma_squared_estimation_iterations)..iterations)
+                .contains(&iter_index);
+        let learning_rate = if iter_index < iterations - six_sigma_squared_estimation_iterations {
+            iter_index as f64 / iterations_per_phase as f64
+        } else {
+            1.0
+        };
         let learning_rate = 1.0 - learning_rate.fract();
         let mut measurements_to_work_on = None;
+
+        let six_sigma_squared_estimation_iter_index =
+            iter_index.wrapping_sub(iterations - six_sigma_squared_estimation_iterations);
+        let six_sigma_squared_estimation_point_index = six_sigma_squared_estimation_iter_index
+            / six_sigma_squared_estimation_iterations_per_point;
+        if is_in_final_six_sigma_squared_estimation
+            && six_sigma_squared_estimation_iter_index
+                % six_sigma_squared_estimation_iterations_per_point
+                == 0
+        {
+            estimated_position = actual_estimated_position;
+            match six_sigma_squared_estimation_point_index {
+                0 => estimated_position.x.value -= estimated_position.x.six_sigma_squared.sqrt(),
+                1 => estimated_position.x.value += estimated_position.x.six_sigma_squared.sqrt(),
+                2 => estimated_position.y.value -= estimated_position.y.six_sigma_squared.sqrt(),
+                3 => estimated_position.y.value += estimated_position.y.six_sigma_squared.sqrt(),
+                4 => estimated_position.z.value -= estimated_position.z.six_sigma_squared.sqrt(),
+                5 => estimated_position.z.value += estimated_position.z.six_sigma_squared.sqrt(),
+                6.. => panic!(
+                    "There shouldn't be more than 6 six_sigma_squared estimation points (2 for each dimension)!"
+                ),
+            }
+        };
 
         if only_use_measurements_with_no_latent_variables {
             let measurements_with_no_latent_variables = measurements
@@ -144,7 +183,7 @@ pub fn multilateration(
                 }
             }
 
-            if is_last_iter && can_use_measurement_for_position_update(measurement) {
+            if is_last_phases_iter && can_use_measurement_for_position_update(measurement) {
                 let weight = ((estimated_distance
                     + (measurement_distance_std_dev
                         * (measurement.distance - estimated_distance).signum()))
@@ -214,7 +253,7 @@ pub fn multilateration(
         estimated_position.y.value += update.y.value;
         estimated_position.z.value += update.z.value;
 
-        if is_last_iter {
+        if is_last_phases_iter {
             estimated_position.x.six_sigma_squared = if real_measurements_to_work_on_lens.0 == 0.0 {
                 estimated_position.x.real = false;
                 0.0
@@ -233,8 +272,65 @@ pub fn multilateration(
             } else {
                 (total_weighted_six_sigma_z / real_measurements_to_work_on_lens.2).powi(2)
             };
+
+            actual_estimated_position = estimated_position;
         }
+
+        if is_in_final_six_sigma_squared_estimation {
+            let mut six_sigma_squared_estimation_point = estimated_position;
+            // If even, we use the lowest and if odd we use the highest since even estimated points had
+            // lower initial guesses and odd ones had higher guesses. This way, we are protected against
+            // oscillating position estimates since we will always choose the one that yields less
+            // reported accuracy.
+            let most_general_point = |v1: f64, v2: f64| -> f64 {
+                if six_sigma_squared_estimation_point_index % 2 == 0 {
+                    v1.min(v2)
+                } else {
+                    v1.max(v2)
+                }
+            };
+            six_sigma_squared_estimation_point.x.value = most_general_point(
+                estimated_position.x.value,
+                previous_estimated_position.x.value,
+            );
+            six_sigma_squared_estimation_point.y.value = most_general_point(
+                estimated_position.y.value,
+                previous_estimated_position.y.value,
+            );
+            six_sigma_squared_estimation_point.z.value = most_general_point(
+                estimated_position.z.value,
+                previous_estimated_position.z.value,
+            );
+
+            six_sigma_squared_estimation_points[six_sigma_squared_estimation_point_index] =
+                six_sigma_squared_estimation_point;
+
+            if iter_index == iterations - 1 {
+                let first_x = six_sigma_squared_estimation_points[0].x;
+                let second_x = six_sigma_squared_estimation_points[1].x;
+                let first_y = six_sigma_squared_estimation_points[2].y;
+                let second_y = six_sigma_squared_estimation_points[3].y;
+                let first_z = six_sigma_squared_estimation_points[4].z;
+                let second_z = six_sigma_squared_estimation_points[5].z;
+
+                let final_x = (first_x.value + second_x.value) / 2.0;
+                let final_x_six_sigma_squared = (first_x.value - second_x.value).div(2.0).powi(2);
+                let final_y = (first_y.value + second_y.value) / 2.0;
+                let final_y_six_sigma_squared = (first_y.value - second_y.value).div(2.0).powi(2);
+                let final_z = (first_z.value + second_z.value) / 2.0;
+                let final_z_six_sigma_squared = (first_z.value - second_z.value).div(2.0).powi(2);
+
+                actual_estimated_position.x.value = final_x;
+                actual_estimated_position.x.six_sigma_squared = final_x_six_sigma_squared;
+                actual_estimated_position.y.value = final_y;
+                actual_estimated_position.y.six_sigma_squared = final_y_six_sigma_squared;
+                actual_estimated_position.z.value = final_z;
+                actual_estimated_position.z.six_sigma_squared = final_z_six_sigma_squared;
+            }
+        }
+
+        previous_estimated_position = estimated_position;
     }
 
-    estimated_position
+    actual_estimated_position
 }
