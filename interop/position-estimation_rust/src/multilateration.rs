@@ -334,3 +334,74 @@ pub fn multilateration(
 
     actual_estimated_position
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        coordinate::Coordinate, measurement::Measurement, multilateration::multilateration,
+        position::Position,
+    };
+
+    #[test]
+    fn basic() {
+        let mut measurements = vec![];
+
+        measurements.push(Measurement {
+            position: Position {
+                x: Coordinate::new_real(1.5, 1.0_f64.powi(2)),
+                ..Default::default()
+            },
+            distance: 4.0,
+            weight: 0.0,
+        });
+        measurements.push(Measurement {
+            position: Position {
+                x: Coordinate::new_real(12.0, 1.5_f64.powi(2)),
+                ..Default::default()
+            },
+            distance: 5.5,
+            weight: 0.0,
+        });
+
+        let expected = Position {
+            // Most accurate result would be value: 5.75, six_sigma_squared: 0.75_f64.powi(2).
+            x: Coordinate::new_real(5.868107855175952, 0.3015669990124259_f64.powi(2)),
+            ..Default::default()
+        };
+
+        let result = multilateration(&mut measurements, None, 50);
+
+        assert_eq!(expected.x.value, result.x.value);
+        assert_eq!(expected.x.six_sigma_squared, result.x.six_sigma_squared);
+
+        let mut measurements = vec![];
+
+        measurements.push(Measurement {
+            position: Position {
+                x: Coordinate::new_real(9.5, 1.0_f64.powi(2)),
+                ..Default::default()
+            },
+            distance: 4.0,
+            weight: 0.0,
+        });
+        measurements.push(Measurement {
+            position: Position {
+                x: Coordinate::new_real(12.0, 1.5_f64.powi(2)),
+                ..Default::default()
+            },
+            distance: 5.5,
+            weight: 0.0,
+        });
+
+        let expected = Position {
+            // Most accurate result would be value: 5.75, six_sigma_squared: 0.75_f64.powi(2).
+            x: Coordinate::new_real(5.756402373747081, 0.6326516952769938_f64.powi(2)),
+            ..Default::default()
+        };
+
+        let result = multilateration(&mut measurements, None, 50);
+
+        assert_eq!(expected.x.value, result.x.value);
+        assert_eq!(expected.x.six_sigma_squared, result.x.six_sigma_squared)
+    }
+}
