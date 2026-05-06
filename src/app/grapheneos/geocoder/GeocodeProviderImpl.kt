@@ -23,7 +23,7 @@ class GeocodeProviderImpl(private val context: Context) : GeocodeProviderBase(co
     ) {
         verboseLog(TAG) {
             "forward geocode parameters: locationName: ${request.locationName}, " +
-                    "lowerLeftLatitude: ${request.lowerLeftLongitude}, lowerLeftLongitude: ${request.lowerLeftLongitude}, " +
+                    "lowerLeftLatitude: ${request.lowerLeftLatitude}, lowerLeftLongitude: ${request.lowerLeftLongitude}, " +
                     "upperRightLatitude: ${request.upperRightLatitude}, upperrightlongitude: ${request.upperRightLongitude}, " +
                     "maxResults: ${request.maxResults}, locale: ${request.locale}"
         }
