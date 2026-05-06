@@ -91,7 +91,7 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
                 + measurement.position.z.variance)
                 .sqrt()
                 // Prevent division by zero.
-                .max(f64::MIN);
+                .max(f64::MIN_POSITIVE);
             let standardized_residual = residual / standard_deviation;
             // within 2 standard deviations
             let threshold = 2.0;
