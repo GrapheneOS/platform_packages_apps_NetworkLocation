@@ -8,6 +8,7 @@ import android.net.wifi.rtt.RangingResultCallback
 import android.net.wifi.rtt.WifiRttManager
 import android.os.WorkSource
 import app.grapheneos.verboseLog
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -19,6 +20,7 @@ private const val TAG = "WifiApRanger"
  * TODO: WIP Wi-Fi RTT AP ranger, not currently used.
  */
 class WifiApRanger(private val context: Context) {
+    private val rangingExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
     @Throws(WifiRangerUnavailableException::class, WifiRangerFailedException::class)
     suspend fun range(scanResults: List<ScanResult>, workSource: WorkSource): List<RangingResult> {
@@ -51,16 +53,16 @@ class WifiApRanger(private val context: Context) {
                 }
             }
             verboseLog(TAG) { "calling startRanging" }
-            val executor = Executors.newSingleThreadExecutor()
             wifiRttManager.startRanging(
                 workSource,
                 request,
-                executor,
+                rangingExecutor,
                 rangingResultCallback
             )
             continuation.invokeOnCancellation {
                 verboseLog(TAG) {"cancelling ranging"}
                 wifiRttManager.cancelRanging(workSource)
+                rangingExecutor.shutdownNow()
                 verboseLog(TAG) {"canceled ranging"}
             }
         }
