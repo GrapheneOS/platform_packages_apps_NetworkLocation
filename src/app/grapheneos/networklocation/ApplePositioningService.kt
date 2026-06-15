@@ -95,11 +95,11 @@ class ApplePositioningService {
         val setting = NETWORK_LOCATION_SETTING.get(context)
         return when (setting) {
             NETWORK_LOCATION_APPLE_CHINA ->
-                "https://gs-loc-cn.apple.com/clls/wloc"
+                URL("https://gs-loc-cn.apple.com/clls/wloc")
             NETWORK_LOCATION_GRAPHENEOS_APPLE_PROXY ->
-                "https://gs-loc.apple.grapheneos.org/clls/wloc"
+                URL("https://gs-loc.apple.grapheneos.org/clls/wloc")
             NETWORK_LOCATION_APPLE ->
-                "https://gs-loc.apple.com/clls/wloc"
+                URL("https://gs-loc.apple.com/clls/wloc")
             NETWORK_LOCATION_DISABLED ->
                 // network location can be disabled by the user at any point
                 throw IOException("network location setting became disabled")
