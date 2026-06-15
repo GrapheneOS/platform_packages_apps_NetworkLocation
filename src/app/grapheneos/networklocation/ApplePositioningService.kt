@@ -31,13 +31,11 @@ class ApplePositioningService {
 
     @Throws(IOException::class)
     fun fetch(request: ALSLocationRequest): ALSLocationResponse {
-        val (url, enforceModernTls) = getServerUrl()
+        val url = getServerUrl()
 
         val connection = url.openConnection() as HttpsURLConnection
         try {
-            if (enforceModernTls) {
-                connection.sslSocketFactory = tlsSocketFactory
-            }
+            connection.sslSocketFactory = tlsSocketFactory
             connection.requestMethod = "POST"
             connection.setRequestProperty("Accept", "*/*")
             connection.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
@@ -92,21 +90,21 @@ class ApplePositioningService {
     }
 
     @Throws(IOException::class)
-    private fun getServerUrl(): Pair<URL, Boolean> {
+    private fun getServerUrl(): URL {
         val context: Context = AppGlobals.getInitialApplication()
         val setting = NETWORK_LOCATION_SETTING.get(context)
-        return when (setting) {
+        return URL(when (setting) {
             NETWORK_LOCATION_APPLE_CHINA ->
-                Pair(URL("https://gs-loc-cn.apple.com/clls/wloc"), false)
+                "https://gs-loc-cn.apple.com/clls/wloc"
             NETWORK_LOCATION_GRAPHENEOS_APPLE_PROXY ->
-                Pair(URL("https://gs-loc.apple.grapheneos.org/clls/wloc"), true)
+                "https://gs-loc.apple.grapheneos.org/clls/wloc"
             NETWORK_LOCATION_APPLE ->
-                Pair(URL("https://gs-loc.apple.com/clls/wloc"), false)
+                "https://gs-loc.apple.com/clls/wloc"
             NETWORK_LOCATION_DISABLED ->
                 // network location can be disabled by the user at any point
                 throw IOException("network location setting became disabled")
             else ->
                 throw IllegalStateException("unexpected URL setting: $setting")
-        }
+        })
     }
 }
