@@ -540,10 +540,14 @@ class LocationReportingTask(
         val estimatedGeoPoint = enuPointToGeoPoint(enuPoint, refGeoPoint)
         loc.longitude = estimatedGeoPoint.longitude
         loc.latitude = estimatedGeoPoint.latitude
-        loc.accuracy = sqrt(max(result.x.sixSigmaSquared, result.y.sixSigmaSquared)).toFloat()
+        val accuracySixSigma = sqrt(max(result.x.sixSigmaSquared, result.y.sixSigmaSquared))
+        // Convert from 6-sigma to 1-sigma
+        loc.accuracy = accuracySixSigma.div(6.0).toFloat()
         estimatedGeoPoint.altitude?.let { estimatedAltitude ->
             loc.altitude = estimatedAltitude
-            loc.verticalAccuracyMeters = sqrt(result.z.sixSigmaSquared).toFloat()
+            val verticalAccuracySixSigma = sqrt(result.z.sixSigmaSquared)
+            // Convert from 6-sigma to 1-sigma
+            loc.verticalAccuracyMeters = verticalAccuracySixSigma.div(6.0).toFloat()
         }
         return loc
     }

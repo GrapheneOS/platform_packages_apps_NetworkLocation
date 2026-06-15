@@ -139,12 +139,17 @@ class NominatimGeocoder : Geocoder {
         }
         val result = mutableListOf<Address>()
         for (feature in response.features?.take(expectedMaxResults) ?: emptyList()) {
+            val coordinates = feature.geometry.coordinates
+            if (coordinates.size < 2) {
+                Log.w(TAG, "skipping feature with invalid coordinates size: ${coordinates.size}")
+                continue
+            }
             val extra = feature.properties.geocoding.extra?.toMutableMap()
             // we don't know which locale was actually used, so we just assume it was the one
             // we requested
             val address = Address(preferredLocale)
-            address.latitude = feature.geometry.coordinates[1]
-            address.longitude = feature.geometry.coordinates[0]
+            address.latitude = coordinates[1]
+            address.longitude = coordinates[0]
             with(feature.properties.geocoding) {
                 address.postalCode = this.postcode
                 address.featureName = this.name
