@@ -14,7 +14,7 @@ use crate::{
 };
 
 // SAFETY: There is no other global function of this name.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1estimation_PositionEstimation_estimatePosition(
     mut env: JNIEnv,
     _class: JClass,
