@@ -1,0 +1,21 @@
+rust_defaults {
+    name: "libnetwork_location_population_density_rust_defaults",
+    crate_name: "network_location_population_density",
+    srcs: ["src/lib.rs"],
+    rustlibs: [
+        "libjni",
+        "libpopulation_density",
+    ],
+    edition: "2024",
+}
+
+rust_ffi_shared {
+    name: "libnetwork_location_population_density_rust",
+    defaults: ["libnetwork_location_population_density_rust_defaults"],
+}
+
+rust_test_host {
+    name: "libnetwork_location_population_density_rust_inline_tests",
+    defaults: ["libnetwork_location_population_density_rust_defaults"],
+    test_suites: ["general-tests"],
+}

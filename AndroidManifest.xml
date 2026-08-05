@@ -52,6 +52,23 @@
                 android:value="true" />
         </service>
 
+        <service
+            android:name="app.grapheneos.populationdensity.PopulationDensityService"
+            android:directBootAware="true"
+            android:exported="false"
+            android:permission="android.permission.BIND_POPULATION_DENSITY_PROVIDER_SERVICE">
+            <intent-filter>
+                <action android:name="com.android.location.service.PopulationDensityProvider" />
+            </intent-filter>
+
+            <meta-data
+                android:name="serviceVersion"
+                android:value="0" />
+            <meta-data
+                android:name="serviceIsMultiuser"
+                android:value="true" />
+        </service>
+
     </application>
 
 </manifest>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configuration description="Runs process-cold population density tests">
+    <option name="not-shardable" value="true" />
+
+    <target_preparer class="com.android.tradefed.targetprep.suite.SuiteApkInstaller">
+        <option name="cleanup-apks" value="true" />
+        <option
+            name="test-file-name"
+            value="NetworkLocationPopulationDensityColdStartTests.apk" />
+    </target_preparer>
+
+    <target_preparer class="com.android.tradefed.targetprep.RunCommandTargetPreparer">
+        <option name="test-user-token" value="%TEST_USER%" />
+        <option
+            name="teardown-command"
+            value="am instrument --user %TEST_USER% -w -r -e class app.grapheneos.populationdensity.PopulationDensityColdStateTest#restoreProviderServiceIfNeeded app.grapheneos.networklocation.coldtests/androidx.test.runner.AndroidJUnitRunner" />
+    </target_preparer>
+
+    <target_preparer class="com.android.tradefed.targetprep.InstrumentationPreparer">
+        <option name="package" value="app.grapheneos.networklocation.coldtests" />
+        <option name="runner" value="androidx.test.runner.AndroidJUnitRunner" />
+        <option
+            name="class"
+            value="app.grapheneos.populationdensity.PopulationDensityColdStateTest" />
+        <option name="method" value="disableProviderService" />
+    </target_preparer>
+
+    <target_preparer class="com.android.tradefed.targetprep.RunCommandTargetPreparer">
+        <option name="test-user-token" value="%TEST_USER%" />
+        <option
+            name="run-command"
+            value="am force-stop --user %TEST_USER% app.grapheneos.networklocation" />
+        <option name="throw-if-cmd-fail" value="true" />
+    </target_preparer>
+
+    <test class="com.android.tradefed.testtype.AndroidJUnitTest">
+        <option name="package" value="app.grapheneos.networklocation.coldtests" />
+        <option name="runner" value="androidx.test.runner.AndroidJUnitRunner" />
+        <option
+            name="class"
+            value="app.grapheneos.populationdensity.PopulationDensityColdStartTest" />
+    </test>
+
+    <test class="com.android.tradefed.testtype.AndroidJUnitTest">
+        <option name="package" value="app.grapheneos.networklocation.coldtests" />
+        <option name="runner" value="androidx.test.runner.AndroidJUnitRunner" />
+        <option
+            name="class"
+            value="app.grapheneos.populationdensity.PopulationDensityColdStateTest" />
+        <option name="method" value="restoreProviderService" />
+    </test>
+</configuration>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="app.grapheneos.networklocation.tests">
+
+    <uses-permission
+        android:name="android.permission.BIND_POPULATION_DENSITY_PROVIDER_SERVICE" />
+
+    <application />
+
+    <instrumentation
+        android:name="androidx.test.runner.AndroidJUnitRunner"
+        android:targetPackage="app.grapheneos.networklocation"
+        android:label="Tests for NetworkLocation" />
+</manifest>

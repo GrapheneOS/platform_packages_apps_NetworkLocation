@@ -1,0 +1,53 @@
+android_test {
+    name: "NetworkLocationTests",
+
+    srcs: ["src/**/*.kt"],
+    manifest: "AndroidManifest.xml",
+
+    instrumentation_for: "NetworkLocation",
+    certificate: "platform",
+    platform_apis: true,
+
+    libs: [
+        "com.android.location.provider.impl",
+    ],
+
+    static_libs: [
+        "androidx.test.core",
+        "androidx.test.ext.junit",
+        "androidx.test.rules",
+        "androidx.test.runner",
+        "junit",
+    ],
+
+    test_suites: ["device-tests"],
+}
+
+android_test {
+    name: "NetworkLocationPopulationDensityColdStartTests",
+
+    srcs: [
+        "cold/src/**/*.kt",
+        "src/app/grapheneos/populationdensity/PopulationDensityTestUtils.kt",
+    ],
+    manifest: "cold/AndroidManifest.xml",
+    test_config: "cold/AndroidTest.xml",
+
+    instrumentation_for: "NetworkLocation",
+    certificate: "platform",
+    platform_apis: true,
+
+    libs: [
+        "com.android.location.provider.impl",
+    ],
+
+    static_libs: [
+        "androidx.test.core",
+        "androidx.test.ext.junit",
+        "androidx.test.rules",
+        "androidx.test.runner",
+        "junit",
+    ],
+
+    test_suites: ["device-tests"],
+}

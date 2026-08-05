@@ -9,6 +9,8 @@ android_app {
     platform_apis: true,
 
     kotlincflags: ["-Xplugin=external/kotlinc/lib/kotlinx-serialization-compiler-plugin.jar"],
+    // Store .bin resources uncompressed so they can be memory-mapped.
+    aaptflags: ["-0 .bin"],
 
     static_libs: [
         "androidx.core_core",
@@ -25,6 +27,7 @@ android_app {
 
     jni_libs: [
         "libnetwork_location_position_estimation_rust",
+        "libnetwork_location_population_density_rust",
     ],
 
     required: [

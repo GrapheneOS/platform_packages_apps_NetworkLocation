@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="app.grapheneos.networklocation.coldtests">
+
+    <application />
+
+    <instrumentation
+        android:name="androidx.test.runner.AndroidJUnitRunner"
+        android:targetPackage="app.grapheneos.networklocation"
+        android:label="Process-cold tests for NetworkLocation" />
+</manifest>
