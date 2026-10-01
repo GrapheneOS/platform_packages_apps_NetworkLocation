@@ -258,18 +258,21 @@ pub fn multilateration(
                 estimated_position.x.real = false;
                 0.0
             } else {
+                estimated_position.x.real = true;
                 (total_weighted_six_sigma_x / real_measurements_to_work_on_lens.0).powi(2)
             };
             estimated_position.y.six_sigma_squared = if real_measurements_to_work_on_lens.1 == 0.0 {
                 estimated_position.y.real = false;
                 0.0
             } else {
+                estimated_position.y.real = true;
                 (total_weighted_six_sigma_y / real_measurements_to_work_on_lens.1).powi(2)
             };
             estimated_position.z.six_sigma_squared = if real_measurements_to_work_on_lens.2 == 0.0 {
                 estimated_position.z.real = false;
                 0.0
             } else {
+                estimated_position.z.real = true;
                 (total_weighted_six_sigma_z / real_measurements_to_work_on_lens.2).powi(2)
             };
 
@@ -403,5 +406,22 @@ mod tests {
 
         assert_eq!(expected.x.value, result.x.value);
         assert_eq!(expected.x.six_sigma_squared, result.x.six_sigma_squared)
+    }
+
+    #[test]
+    fn real_follows_measurements() {
+        let mut measurements = vec![Measurement {
+            position: Position {
+                z: Coordinate::new_real(1.0, 1.0),
+                ..Default::default()
+            },
+            distance: 0.0,
+            weight: 0.0,
+        }];
+
+        let result = multilateration(&mut measurements, None, 50);
+
+        assert!(!result.x.real);
+        assert!(result.z.real);
     }
 }
