@@ -310,7 +310,8 @@ class LocationReportingTask(
             SystemClock.elapsedRealtime() - loc.elapsedRealtimeNanos / 1_000_000L
         loc.time = max(0L, System.currentTimeMillis() - locationAgeMillis)
 
-        val enuPoint = Point(result.x.value, result.y.value, result.z.value)
+        val z = if (result.z.real) result.z.value else null
+        val enuPoint = Point(result.x.value, result.y.value, z)
         val estimatedGeoPoint = enuPointToGeoPoint(enuPoint, refGeoPoint)
         loc.longitude = estimatedGeoPoint.longitude
         loc.latitude = estimatedGeoPoint.latitude
@@ -536,7 +537,8 @@ class LocationReportingTask(
             SystemClock.elapsedRealtime() - loc.elapsedRealtimeNanos / 1_000_000L
         loc.time = max(0L, System.currentTimeMillis() - locationAgeMillis)
 
-        val enuPoint = Point(result.x.value, result.y.value, result.z.value)
+        val z = if (result.z.real) result.z.value else null
+        val enuPoint = Point(result.x.value, result.y.value, z)
         val estimatedGeoPoint = enuPointToGeoPoint(enuPoint, refGeoPoint)
         loc.longitude = estimatedGeoPoint.longitude
         loc.latitude = estimatedGeoPoint.latitude
