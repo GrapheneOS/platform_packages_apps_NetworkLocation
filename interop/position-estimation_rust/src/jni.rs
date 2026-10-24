@@ -11,6 +11,7 @@ use log::{debug, LevelFilter};
 
 use crate::{
     coordinate::Coordinate, estimate_position, measurement::Measurement, position::Position,
+    EstimatedPosition,
 };
 
 // SAFETY: There is no other global function of this name.
@@ -19,6 +20,16 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
     mut env: JNIEnv,
     _class: JClass,
     measurements: JObjectArray,
+) -> jobject {
+    estimate_with(&mut env, measurements, estimate_position)
+}
+
+
+
+fn estimate_with(
+    env: &mut JNIEnv,
+    measurements: JObjectArray,
+    estimator: impl FnOnce(&[Measurement]) -> Option<EstimatedPosition>,
 ) -> jobject {
     logger::init(
         logger::Config::default()
@@ -263,7 +274,7 @@ pub extern "system" fn Java_app_grapheneos_networklocation_interop_position_1est
         measurements_converted.push(measurement);
     }
 
-    let estimated_position = estimate_position(&measurements_converted);
+    let estimated_position = estimator(&measurements_converted);
 
     match estimated_position {
         Some(estimated_position) => {

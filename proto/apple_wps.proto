@@ -62,10 +62,12 @@ message ALSLocationResponse {
 message ALSLocation {
   int64 latitude = 1;
   int64 longitude = 2;
+  // Raw database scale in meters. A confidence percentile is not established.
   int32 accuracy = 3;
   optional int32 location_type = 4;
   optional int32 altitude = 5;
   optional int32 vertical_accuracy = 6;
+  // Preserve this field as metadata; its name does not establish percent units.
   optional int32 confidence = 7;
 
   optional uint32 score = 11;

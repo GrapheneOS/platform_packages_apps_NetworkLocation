@@ -6,11 +6,47 @@ use std::ops::{Div, Sub};
 use crate::{measurement::Measurement, position::Position};
 use itertools::Itertools;
 
-/**
- * Multilateration using an algorithm based on Expectation-Maximization.
- */
-pub fn multilateration(
-    measurements: &mut [Measurement],
+/// Inflate uncertainty when the estimate lies too far from an anchor.
+/// Zero tolerance has no multiplicative inflation; this is not a noise model.
+pub(crate) fn residual_inflation(distance: f64, target: f64, tolerance: f64) -> f64 {
+    if tolerance == 0.0 {
+        1.0
+    } else {
+        (((distance + tolerance * (target - distance).signum()) - target) / tolerance).max(1.0)
+    }
+}
+
+/// Numerical entry point for the generic/cellular solver. The coordinate
+/// cutoffs and finite probes are heuristic, not a calibrated confidence model.
+pub fn multilateration_checked(
+    measurements: &[Measurement],
+    initial_guess: Option<Position>,
+    iterations: usize,
+) -> Option<Position> {
+    fn finite(p: Position) -> bool {
+        [p.x, p.y, p.z].iter().all(|c| {
+            c.value.is_finite() && c.six_sigma_squared.is_finite() && c.six_sigma_squared >= 0.0
+        })
+    }
+    if measurements.is_empty()
+        || iterations < 3
+        || iterations.checked_add(36).is_none()
+        || initial_guess.is_some_and(|p| !finite(p))
+        || measurements
+            .iter()
+            .any(|m| !finite(m.position) || !m.distance.is_finite() || m.distance < 0.0)
+    {
+        return None;
+    }
+    let result = multilateration_internal(measurements, initial_guess, iterations);
+    if !finite(result) || result.number_of_real() == 0 {
+        return None;
+    }
+    Some(result)
+}
+
+fn multilateration_internal(
+    measurements: &[Measurement],
     initial_guess: Option<Position>,
     iterations: usize,
 ) -> Position {
@@ -73,7 +109,7 @@ pub fn multilateration(
 
         if only_use_measurements_with_no_latent_variables {
             let measurements_with_no_latent_variables = measurements
-                .iter_mut()
+                .iter()
                 .enumerate()
                 .filter(|measurement| {
                     let position = measurement.1.position;
@@ -103,19 +139,22 @@ pub fn multilateration(
         let mut total_weighted_six_sigma_z = 0.0;
 
         for measurement_index in &measurements_to_work_on {
-            let mut measurement = measurements[*measurement_index];
+            let measurement = measurements[*measurement_index];
 
             let mut x_delta = estimated_position.x.value - measurement.position.x.value;
             let mut y_delta = estimated_position.y.value - measurement.position.y.value;
             let mut z_delta = estimated_position.z.value - measurement.position.z.value;
 
-            if x_delta.abs() <= measurement.position.x.six_sigma_squared.sqrt() {
+            // A probe can land exactly on an anchor's axis cutoff. Roundoff
+            // must not activate an entire axis-sized update at that boundary.
+            // Use the same tolerance as the horizontal Wi-Fi specialization.
+            if x_delta.abs() <= measurement.position.x.six_sigma_squared.sqrt() * (1.0 + 1e-12) {
                 x_delta = 0.0
             }
-            if y_delta.abs() <= measurement.position.y.six_sigma_squared.sqrt() {
+            if y_delta.abs() <= measurement.position.y.six_sigma_squared.sqrt() * (1.0 + 1e-12) {
                 y_delta = 0.0
             }
-            if z_delta.abs() <= measurement.position.z.six_sigma_squared.sqrt() {
+            if z_delta.abs() <= measurement.position.z.six_sigma_squared.sqrt() * (1.0 + 1e-12) {
                 z_delta = 0.0
             }
 
@@ -138,7 +177,7 @@ pub fn multilateration(
                 + measurement.position.y.six_sigma_squared
                 + measurement.position.z.six_sigma_squared)
                 .sqrt();
-            measurement.weight = if (measurement.distance - estimated_distance).abs()
+            let weight = if (measurement.distance - estimated_distance).abs()
                 > measurement_distance_std_dev
                 && estimated_distance > 0.0
             {
@@ -151,25 +190,12 @@ pub fn multilateration(
                 0.0
             };
 
-            let update_x = ((x_delta_squared * measurement.weight).abs().sqrt()
-                * (x_delta * measurement.weight).signum())
+            let update_x = ((x_delta_squared * weight).abs().sqrt() * (x_delta * weight).signum())
                 * learning_rate;
-            let update_y = ((y_delta_squared * measurement.weight).abs().sqrt()
-                * (y_delta * measurement.weight).signum())
+            let update_y = ((y_delta_squared * weight).abs().sqrt() * (y_delta * weight).signum())
                 * learning_rate;
-            let update_z = ((z_delta_squared * measurement.weight).abs().sqrt()
-                * (z_delta * measurement.weight).signum())
+            let update_z = ((z_delta_squared * weight).abs().sqrt() * (z_delta * weight).signum())
                 * learning_rate;
-
-            if !is_x_real {
-                measurement.position.x.value -= update_x;
-            }
-            if !is_y_real {
-                measurement.position.y.value -= update_y;
-            }
-            if !is_z_real {
-                measurement.position.z.value -= update_z;
-            }
 
             if can_use_measurement_for_position_update(measurement) {
                 if is_x_real {
@@ -184,12 +210,11 @@ pub fn multilateration(
             }
 
             if is_last_phases_iter && can_use_measurement_for_position_update(measurement) {
-                let weight = ((estimated_distance
-                    + (measurement_distance_std_dev
-                        * (measurement.distance - estimated_distance).signum()))
-                    - measurement.distance)
-                    / measurement_distance_std_dev;
-                let weight = weight.max(1.0);
+                let weight = residual_inflation(
+                    estimated_distance,
+                    measurement.distance,
+                    measurement_distance_std_dev,
+                );
                 if is_x_real {
                     total_weighted_six_sigma_x += x_six_sigma_squared.sqrt() * weight;
                 }
@@ -254,6 +279,9 @@ pub fn multilateration(
         estimated_position.z.value += update.z.value;
 
         if is_last_phases_iter {
+            estimated_position.x.real = real_measurements_to_work_on_lens.0 > 0.0;
+            estimated_position.y.real = real_measurements_to_work_on_lens.1 > 0.0;
+            estimated_position.z.real = real_measurements_to_work_on_lens.2 > 0.0;
             estimated_position.x.six_sigma_squared = if real_measurements_to_work_on_lens.0 == 0.0 {
                 estimated_position.x.real = false;
                 0.0
@@ -336,72 +364,172 @@ pub fn multilateration(
 }
 
 #[cfg(test)]
-mod tests {
+mod checked_contract {
     use crate::{
-        coordinate::Coordinate, measurement::Measurement, multilateration::multilateration,
-        position::Position,
+        coordinate::Coordinate, measurement::Measurement,
+        multilateration::multilateration_checked as solve, position::Position,
     };
 
     #[test]
-    fn basic() {
-        let mut measurements = vec![];
+    fn uncertainty_probe_roundoff_cannot_move_the_position() {
+        let estimate = |axes: (usize, usize), epsilon: f64| {
+            let measurements: Vec<_> = (0..3)
+                .map(|index| {
+                    let mut coordinates = [Coordinate::new_fake(); 3];
+                    coordinates[axes.0] =
+                        Coordinate::new_real(if index == 0 { -2000.0 } else { 0.0 }, 1_000_000.0);
+                    coordinates[axes.1] =
+                        Coordinate::new_real(if index == 0 { epsilon } else { 0.0 }, 1_000_000.0);
+                    Measurement {
+                        position: Position {
+                            x: coordinates[0],
+                            y: coordinates[1],
+                            z: coordinates[2],
+                        },
+                        distance: 0.0,
+                        weight: 0.0,
+                    }
+                })
+                .collect();
+            let initial =
+                Position::average(&measurements.iter().map(|m| m.position).collect::<Vec<_>>());
+            solve(&measurements, Some(initial), 99).unwrap()
+        };
+        for axes in [(0, 1), (1, 2), (2, 0)] {
+            let baseline = estimate(axes, 0.0);
+            for epsilon in [-1e-10, -1e-11, -1e-12, 1e-12, 1e-11, 1e-10] {
+                let result = estimate(axes, epsilon);
+                let movement = (result.x.value - baseline.x.value)
+                    .hypot(result.y.value - baseline.y.value)
+                    .hypot(result.z.value - baseline.z.value);
+                assert!(
+                    movement < 1e-6,
+                    "axes {axes:?}: input perturbation {epsilon} moved the result {movement} m"
+                );
+            }
+        }
+    }
 
-        measurements.push(Measurement {
+    #[test]
+    fn public_estimator_cannot_report_a_fix_without_observed_coordinates() {
+        let m = Measurement {
+            position: Position::default(),
+            distance: 0.0,
+            weight: 0.0,
+        };
+        assert!(crate::estimate_position(&[m]).is_none());
+    }
+
+    fn anchor() -> Measurement {
+        Measurement {
             position: Position {
-                x: Coordinate::new_real(1.5, 1.0_f64.powi(2)),
-                ..Default::default()
+                x: Coordinate::new_real(0.0, 1.0),
+                y: Coordinate::new_real(0.0, 1.0),
+                z: Coordinate::new_real(0.0, 1.0),
             },
             distance: 4.0,
             weight: 0.0,
-        });
-        measurements.push(Measurement {
-            position: Position {
-                x: Coordinate::new_real(12.0, 1.5_f64.powi(2)),
-                ..Default::default()
-            },
-            distance: 5.5,
-            weight: 0.0,
-        });
+        }
+    }
 
-        let expected = Position {
-            // Most accurate result would be value: 5.75, six_sigma_squared: 0.75_f64.powi(2).
-            x: Coordinate::new_real(5.868107855175952, 0.3015669990124259_f64.powi(2)),
-            ..Default::default()
+    #[test]
+    fn empty_and_too_short_requests_return_no_estimate() {
+        assert!(solve(&[], None, 50).is_none());
+        for iterations in 0..3 {
+            assert!(solve(&[anchor()], None, iterations).is_none());
+        }
+    }
+
+    #[test]
+    fn invalid_inputs_do_not_mutate_measurements() {
+        for bad in [f64::NAN, f64::INFINITY, -1.0] {
+            let mut a = anchor();
+            a.position.y.six_sigma_squared = bad;
+            let before = a.position.x.value;
+            let m = [a];
+            assert!(solve(&m, None, 50).is_none());
+            assert_eq!(m[0].position.x.value, before);
+        }
+    }
+
+    #[test]
+    fn unobserved_axis_remains_unobserved() {
+        let mut a = anchor();
+        a.position.x.real = false;
+        let m = [a];
+        let initial = Position {
+            x: Coordinate::new_real(20.0, 0.0),
+            y: Coordinate::new_real(0.0, 0.0),
+            z: Coordinate::new_real(0.0, 0.0),
         };
+        let p = solve(&m, Some(initial), 99).unwrap();
+        assert_eq!(m[0].position.x.value, a.position.x.value);
+        assert_eq!(m[0].position.y.value, a.position.y.value);
+        assert_eq!(m[0].position.z.value, a.position.z.value);
+        assert!(!m[0].position.x.real);
+        assert!(!p.x.real, "an unobserved axis must remain unobserved");
+    }
 
-        let result = multilateration(&mut measurements, None, 50);
+    #[test]
+    fn all_observed_axes_are_marked_real_without_an_initial_guess() {
+        let p = solve(&[anchor()], None, 50).unwrap();
+        assert!(p.x.real && p.y.real && p.z.real);
+    }
 
-        assert_eq!(expected.x.value, result.x.value);
-        assert_eq!(expected.x.six_sigma_squared, result.x.six_sigma_squared);
-
-        let mut measurements = vec![];
-
-        measurements.push(Measurement {
+    #[test]
+    fn zero_tolerance_produces_a_finite_estimate() {
+        let m = Measurement {
             position: Position {
-                x: Coordinate::new_real(9.5, 1.0_f64.powi(2)),
-                ..Default::default()
+                x: Coordinate::new_real(0.0, 0.0),
+                y: Coordinate::new_real(0.0, 0.0),
+                z: Coordinate::new_real(0.0, 0.0),
             },
-            distance: 4.0,
+            distance: 3.0,
             weight: 0.0,
-        });
-        measurements.push(Measurement {
-            position: Position {
-                x: Coordinate::new_real(12.0, 1.5_f64.powi(2)),
-                ..Default::default()
-            },
-            distance: 5.5,
-            weight: 0.0,
-        });
-
-        let expected = Position {
-            // Most accurate result would be value: 5.75, six_sigma_squared: 0.75_f64.powi(2).
-            x: Coordinate::new_real(5.756402373747081, 0.6326516952769938_f64.powi(2)),
-            ..Default::default()
         };
+        let initial = Position {
+            x: Coordinate::new_real(20.0, 0.0),
+            y: Coordinate::new_real(0.0, 0.0),
+            z: Coordinate::new_real(0.0, 0.0),
+        };
+        // At the last fit iteration the residual is positive. An infinite
+        // inflation factor would turn the zero scale into NaN.
+        let p = solve(&[m], Some(initial), 3).unwrap();
+        for coordinate in [p.x, p.y, p.z] {
+            assert!(coordinate.value.is_finite());
+            assert!(coordinate.six_sigma_squared.is_finite());
+            assert!(coordinate.six_sigma_squared >= 0.0);
+        }
+    }
 
-        let result = multilateration(&mut measurements, None, 50);
-
-        assert_eq!(expected.x.value, result.x.value);
-        assert_eq!(expected.x.six_sigma_squared, result.x.six_sigma_squared)
+    #[test]
+    fn exact_well_conditioned_ranges_recover_known_three_dimensional_position() {
+        let truth = [2.0_f64, -3.0, 4.0];
+        let measurements: Vec<_> = [
+            [-10.0, 0.0, 0.0],
+            [10.0, 0.0, 0.0],
+            [0.0, -10.0, 0.0],
+            [0.0, 10.0, 0.0],
+            [0.0, 0.0, -10.0],
+            [0.0, 0.0, 10.0],
+        ]
+        .into_iter()
+        .map(|p| Measurement {
+            position: Position {
+                x: Coordinate::new_real(p[0], 1e-12),
+                y: Coordinate::new_real(p[1], 1e-12),
+                z: Coordinate::new_real(p[2], 1e-12),
+            },
+            distance: (p[0] - truth[0])
+                .hypot(p[1] - truth[1])
+                .hypot(p[2] - truth[2]),
+            weight: 0.0,
+        })
+        .collect();
+        let p = solve(&measurements, None, 999).unwrap();
+        let error = (p.x.value - truth[0])
+            .hypot(p.y.value - truth[1])
+            .hypot(p.z.value - truth[2]);
+        assert!(error < 1e-3, "exact, well-conditioned 3D error = {error} m");
     }
 }

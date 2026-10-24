@@ -6,8 +6,7 @@ import android.os.WorkSource
 import android.telephony.CellInfo
 import android.telephony.TelephonyManager
 import app.grapheneos.verboseLog
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.jvm.Throws
@@ -16,8 +15,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 private const val TAG = "CellTowerScanner"
 
 class CellTowerScanner(private val context: Context) {
-    private val scanExecutor: ExecutorService = Executors.newSingleThreadExecutor()
-
     @Throws(CellScannerUnavailableException::class, CellScanFailedException::class)
     suspend fun scan(workSource: WorkSource): List<CellInfo> {
         if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)) {
@@ -36,13 +33,16 @@ class CellTowerScanner(private val context: Context) {
         }
 
         return suspendCancellableCoroutine { continuation ->
+            val completed = AtomicBoolean()
             val callback = object : TelephonyManager.CellInfoCallback() {
                 override fun onCellInfo(cellInfo: MutableList<CellInfo>) {
+                    if (!completed.compareAndSet(false, true)) return
                     verboseLog(TAG) { "onCellInfo: size: ${cellInfo.size}" }
                     continuation.resume(cellInfo)
                 }
 
                 override fun onError(errorCode: Int, detail: Throwable?) {
+                    if (!completed.compareAndSet(false, true)) return
                     verboseLog(TAG) { "onError: errorCode: $errorCode, detail: $detail" }
                     continuation.resumeWithException(CellScanFailedException(errorCode, detail))
                 }
@@ -50,13 +50,15 @@ class CellTowerScanner(private val context: Context) {
             verboseLog(TAG) { "calling requestCellInfoUpdate" }
             telephonyManager.requestCellInfoUpdate(
                 workSource,
-                scanExecutor,
+                context.mainExecutor,
                 callback,
             )
             continuation.invokeOnCancellation {
-                verboseLog(TAG) { "cancelling scan" }
-                scanExecutor.shutdownNow()
-                verboseLog(TAG) { "maybe cancelled scan" }
+                // Telephony has no cancellation API for this request. Its late
+                // callback must still have a live executor, but cannot finish
+                // the cancelled continuation or a later request.
+                completed.set(true)
+                verboseLog(TAG) { "cancelled scan; ignoring late callbacks" }
             }
         }
     }

@@ -18,11 +18,13 @@ class CellPositioningServiceCache(private val service: CellPositioningService) {
     ): List<CellTowerPositioningData> {
         val isVerbose = Log.isLoggable(TAG, Log.VERBOSE)
         val positioningData = mutableListOf<CellTowerPositioningData>()
+        val cachedIdentifiers = mutableListOf<Identifier>()
         val queryIdentifiers = mutableListOf<Identifier>()
 
-        for (identifier in identifiers) {
+        for (identifier in identifiers.distinct()) {
             val cacheEntry = timedLruCache.checkCache(identifier)
             if (cacheEntry != null) {
+                cachedIdentifiers.add(identifier)
                 val res = cacheEntry.orElse(null).positioningData
                 if (isVerbose) Log.v(
                     TAG,
@@ -48,6 +50,14 @@ class CellPositioningServiceCache(private val service: CellPositioningService) {
         timedLruCache.synchronized {
             for (pd in towerInfos) {
                 timedLruCache.put(pd.identifier, pd)
+            }
+            // Nearby results can replace positive or negative cached records.
+            // Return the updated data for this scan, in the existing order.
+            positioningData.clear()
+            for (identifier in cachedIdentifiers) {
+                timedLruCache.checkCache(identifier)?.orElse(null)?.positioningData?.let {
+                    positioningData.add(CellTowerPositioningData(identifier, it))
+                }
             }
             for ((index, identifier) in queryIdentifiers.withIndex()) {
                 val cacheEntry = timedLruCache.checkCache(identifier)

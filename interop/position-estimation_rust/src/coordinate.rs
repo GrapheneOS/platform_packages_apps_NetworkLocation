@@ -7,7 +7,11 @@ pub struct Coordinate {
     pub real: bool,
     /// coordinate value
     pub value: f64,
-    /// 6-sigma²
+    /// Squared uncertainty scale in m², used for residual tests, weighting,
+    /// and uncertainty probes.
+    /// Wi-Fi uses six-sigma output scaling and divides the square root by six.
+    /// Cellular reports the square root directly.
+    /// See tools/accuracy-semantics.md for input construction and reporting.
     pub six_sigma_squared: f64,
 }
 

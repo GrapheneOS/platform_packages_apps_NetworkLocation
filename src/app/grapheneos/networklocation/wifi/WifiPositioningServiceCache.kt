@@ -19,11 +19,13 @@ class WifiPositioningServiceCache(private val service: WifiPositioningService) {
     ): List<WifiApPositioningData> {
         val isVerbose = Log.isLoggable(TAG, Log.VERBOSE)
         val positioningData = mutableListOf<WifiApPositioningData>()
+        val cachedBssids = mutableListOf<Bssid>()
         val queryBssids = mutableListOf<Bssid>()
 
-        for (bssid in bssids) {
+        for (bssid in bssids.distinct()) {
             val cacheEntry = timedLruCache.checkCache(bssid)
             if (cacheEntry != null) {
+                cachedBssids.add(bssid)
                 val res = cacheEntry.orElse(null).positioningData
                 if (isVerbose) Log.v(
                     TAG,
@@ -49,6 +51,14 @@ class WifiPositioningServiceCache(private val service: WifiPositioningService) {
         timedLruCache.synchronized {
             for (pd in apInfos) {
                 timedLruCache.put(pd.bssid, pd)
+            }
+            // Nearby results can replace positive or negative cached records.
+            // Return the updated data for this scan, in the existing order.
+            positioningData.clear()
+            for (bssid in cachedBssids) {
+                timedLruCache.checkCache(bssid)?.orElse(null)?.positioningData?.let {
+                    positioningData.add(WifiApPositioningData(bssid, it))
+                }
             }
             for ((index, bssid) in queryBssids.withIndex()) {
                 val cacheEntry = timedLruCache.checkCache(bssid)

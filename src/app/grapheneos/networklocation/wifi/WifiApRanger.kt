@@ -8,7 +8,7 @@ import android.net.wifi.rtt.RangingResultCallback
 import android.net.wifi.rtt.WifiRttManager
 import android.os.WorkSource
 import app.grapheneos.verboseLog
-import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -35,14 +35,17 @@ class WifiApRanger(private val context: Context) {
         ).build()
 
         return suspendCancellableCoroutine { continuation ->
+            val completed = AtomicBoolean()
             val rangingResultCallback = object : RangingResultCallback() {
                 override fun onRangingFailure(code: Int) {
+                    if (!completed.compareAndSet(false, true)) return
                     // TODO: maybe log with description
                     verboseLog(TAG) { "onRangingFailure: code: $code" }
                     continuation.resumeWithException(WifiRangerFailedException(code))
                 }
 
                 override fun onRangingResults(results: MutableList<RangingResult>) {
+                    if (!completed.compareAndSet(false, true)) return
                     val filteredResults = results.filter {
                         it.status == RangingResult.STATUS_SUCCESS
                     }
@@ -51,14 +54,14 @@ class WifiApRanger(private val context: Context) {
                 }
             }
             verboseLog(TAG) { "calling startRanging" }
-            val executor = Executors.newSingleThreadExecutor()
             wifiRttManager.startRanging(
                 workSource,
                 request,
-                executor,
+                context.mainExecutor,
                 rangingResultCallback
             )
             continuation.invokeOnCancellation {
+                completed.set(true)
                 verboseLog(TAG) {"cancelling ranging"}
                 wifiRttManager.cancelRanging(workSource)
                 verboseLog(TAG) {"canceled ranging"}

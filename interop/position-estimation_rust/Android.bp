@@ -1,7 +1,10 @@
 rust_defaults {
     name: "libnetwork_location_position_estimation_rust_defaults",
     crate_name: "network_location_position_estimation",
-    srcs: ["src/lib.rs"],
+    crate_root: "src/lib.rs",
+    srcs: [
+        "src/lib.rs",
+    ],
     rustlibs: [
         "libitertools",
         "libjni",
@@ -20,4 +23,15 @@ rust_test_host {
     name: "libnetwork_location_position_estimation_rust_inline_tests",
     defaults: ["libnetwork_location_position_estimation_rust_defaults"],
     test_suites: ["general-tests"],
+}
+
+rust_test {
+    name: "libnetwork_location_position_estimation_rust_device_inline_tests",
+    defaults: ["libnetwork_location_position_estimation_rust_defaults"],
+    test_suites: ["general-tests"],
+}
+
+rust_library_host {
+    name: "libnetwork_location_position_estimation_rust_host",
+    defaults: ["libnetwork_location_position_estimation_rust_defaults"],
 }

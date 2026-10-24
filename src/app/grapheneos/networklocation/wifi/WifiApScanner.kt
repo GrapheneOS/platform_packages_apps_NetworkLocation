@@ -9,6 +9,7 @@ import android.os.WorkSource
 import android.util.Log
 import android.util.SparseArray
 import app.grapheneos.verboseLog
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -44,17 +45,20 @@ class WifiApScanner(private val context: Context) {
         }
 
         return suspendCancellableCoroutine { continuation ->
+            val completed = AtomicBoolean()
             val scanListener = object : ScanListener {
                 override fun onSuccess() {
                     verboseLog(TAG) {"onSuccess"}
                 }
 
                 override fun onFailure(reason: Int, description: String?) {
+                    if (!completed.compareAndSet(false, true)) return
                     verboseLog(TAG) {"onFailure: reason: $reason, description: $description"}
                     continuation.resumeWithException(WifiScanFailedException(reason, description))
                 }
 
                 override fun onResults(results: Array<WifiScanner.ScanData>?) {
+                    if (!completed.compareAndSet(false, true)) return
                     if (results == null) {
                         continuation.resumeWithException(WifiScanFailedException(WifiScanner.REASON_UNSPECIFIED, "results is null"))
                         return
@@ -87,6 +91,7 @@ class WifiApScanner(private val context: Context) {
             verboseLog(TAG) {"calling startScan"}
             wifiScanner.startScan(scanSettings, scanListener, workSource)
             continuation.invokeOnCancellation {
+                completed.set(true)
                 verboseLog(TAG) {"cancelling scan"}
                 wifiScanner.stopScan(scanListener)
                 verboseLog(TAG) {"canceled scan"}

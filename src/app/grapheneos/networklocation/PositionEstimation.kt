@@ -1,7 +1,10 @@
 package app.grapheneos.networklocation
 
 import kotlin.math.cos
+import kotlin.math.abs
 import kotlin.math.pow
+import kotlin.math.min
+import kotlin.math.max
 
 /**
  * WGS84 semi-major axis of the Earth in meters.
@@ -24,6 +27,18 @@ fun rssiToDistance(
     return 10.0.pow((rssiAtOneMeter - rssi) / (10 * pathLossExponent))
 }
 
+/** Ordered distance endpoints; signals stronger than the intercept reverse their order. */
+fun rssiDistanceBounds(
+    rssi: Double,
+    pathLossExponentLower: Double,
+    pathLossExponentHigher: Double,
+    rssiAtOneMeter: Double,
+): Pair<Double, Double> {
+    val first = rssiToDistance(rssi, pathLossExponentHigher, rssiAtOneMeter)
+    val second = rssiToDistance(rssi, pathLossExponentLower, rssiAtOneMeter)
+    return Pair(min(first, second), max(first, second))
+}
+
 fun List<Double>.median(): Double? {
     val sortedList = this.sorted()
     val size = sortedList.size
@@ -37,6 +52,17 @@ fun List<Double>.median(): Double? {
     }
 }
 
+/** Normalize a longitude or longitude difference without rounding values already in range. */
+fun normalizeLongitude(longitude: Double): Double {
+    return if (longitude >= -180.0 && longitude < 180.0) longitude
+        else (longitude + 180.0).mod(360.0) - 180.0
+}
+
+/** A circular median avoids choosing the opposite side of Earth at the dateline. */
+fun List<Double>.medianLongitude(): Double? {
+    return minByOrNull { candidate -> sumOf { abs(normalizeLongitude(it - candidate)) } }
+}
+
 /**
  * Converts the GeoPoint to an ENU (East-North-Up) point relative to the given reference GeoPoint.
  * This method uses a simple Equirectangular approximation which assumes that the Earth is flat in
@@ -48,7 +74,7 @@ fun List<Double>.median(): Double? {
  */
 fun geoPointToEnuPoint(geoPoint: GeoPoint, refGeoPoint: GeoPoint): Point {
     val dLat = Math.toRadians(geoPoint.latitude - refGeoPoint.latitude)
-    val dLon = Math.toRadians(geoPoint.longitude - refGeoPoint.longitude)
+    val dLon = Math.toRadians(normalizeLongitude(geoPoint.longitude - refGeoPoint.longitude))
     val latRad = Math.toRadians(refGeoPoint.latitude)
 
     val x = EARTH_RADIUS * dLon * cos(latRad)
@@ -64,7 +90,7 @@ fun enuPointToGeoPoint(enuPoint: Point, refGeoPoint: GeoPoint): GeoPoint {
     val dLon = enuPoint.x / (EARTH_RADIUS * cos(latRad))
 
     val lat = refGeoPoint.latitude + Math.toDegrees(dLat)
-    val lon = refGeoPoint.longitude + Math.toDegrees(dLon)
+    val lon = normalizeLongitude(refGeoPoint.longitude + Math.toDegrees(dLon))
     val alt = enuPoint.z?.let { refGeoPoint.altitude?.plus(it) }
 
     return GeoPoint(lat, lon, alt)

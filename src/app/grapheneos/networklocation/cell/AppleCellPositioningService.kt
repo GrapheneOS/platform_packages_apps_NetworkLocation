@@ -2,9 +2,9 @@ package app.grapheneos.networklocation.cell
 
 import android.util.Log
 import app.grapheneos.networklocation.ApplePositioningService
+import app.grapheneos.networklocation.convertAppleCellPositioningData
 import app.grapheneos.networklocation.PositioningData
 import app.grapheneos.networklocation.Throttle
-import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocation
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationRequest
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationResponse
 import app.grapheneos.networklocation.proto.AppleWpsProtos.GsmCellTower
@@ -58,7 +58,7 @@ class AppleCellPositioningService : CellPositioningService {
                     lac = tower.tacId,
                     cellId = tower.cellId,
                 ),
-                convertPositioningData(tower.location)
+                convertAppleCellPositioningData(tower.location.takeIf { tower.hasLocation() })
             )
         }
         for (tower in response.lteCellTowersList) {
@@ -70,7 +70,7 @@ class AppleCellPositioningService : CellPositioningService {
                     lac = tower.tacId,
                     cellId = tower.cellId.toLong(),
                 ),
-                convertPositioningData(tower.location)
+                convertAppleCellPositioningData(tower.location.takeIf { tower.hasLocation() })
             )
         }
         for (tower in response.scdmaCellTowersList) {
@@ -82,7 +82,7 @@ class AppleCellPositioningService : CellPositioningService {
                     lac = tower.lacId,
                     cellId = tower.cellId.toLong(),
                 ),
-                convertPositioningData(tower.location)
+                convertAppleCellPositioningData(tower.location.takeIf { tower.hasLocation() })
             )
         }
         for (tower in response.gsmCellTowersList) {
@@ -94,7 +94,7 @@ class AppleCellPositioningService : CellPositioningService {
                     lac = tower.lacId,
                     cellId = tower.cellId.toLong(),
                 ),
-                convertPositioningData(tower.location)
+                convertAppleCellPositioningData(tower.location.takeIf { tower.hasLocation() })
             )
         }
         for (identifier in requestIdentifiers) {
@@ -219,47 +219,28 @@ class AppleCellPositioningService : CellPositioningService {
             response.nr5GCellTowersList.forEachIndexed { i, tower ->
                 Log.v(
                     EXTRA_VERBOSE_TAG, "NR response[$i]: cell ID: ${tower.cellId}, " +
-                            "positioning data: ${convertPositioningData(tower.location)}"
+                            "positioning data: ${convertAppleCellPositioningData(tower.location.takeIf { tower.hasLocation() })}"
                 )
             }
             response.lteCellTowersList.forEachIndexed { i, tower ->
                 Log.v(
                     EXTRA_VERBOSE_TAG, "LTE response[$i]: cell ID: ${tower.cellId}, " +
-                            "positioning data: ${convertPositioningData(tower.location)}"
+                            "positioning data: ${convertAppleCellPositioningData(tower.location.takeIf { tower.hasLocation() })}"
                 )
             }
             response.scdmaCellTowersList.forEachIndexed { i, tower ->
                 Log.v(
                     EXTRA_VERBOSE_TAG, "(S/W)CDMA response[$i]: cell ID: ${tower.cellId}, " +
-                            "positioning data: ${convertPositioningData(tower.location)}"
+                            "positioning data: ${convertAppleCellPositioningData(tower.location.takeIf { tower.hasLocation() })}"
                 )
             }
             response.gsmCellTowersList.forEachIndexed { i, tower ->
                 Log.v(
                     EXTRA_VERBOSE_TAG, "GSM response[$i]: cell ID: ${tower.cellId}, " +
-                            "positioning data: ${convertPositioningData(tower.location)}"
+                            "positioning data: ${convertAppleCellPositioningData(tower.location.takeIf { tower.hasLocation() })}"
                 )
             }
         }
         return response
-    }
-
-    private fun convertPositioningData(pd: ALSLocation): PositioningData? {
-        if (pd.latitude == -18000000000) {
-            return null
-        }
-        val latitude = pd.latitude * 0.000_000_01
-        val longitude = pd.longitude * 0.000_000_01
-        // the API doesn't seem to return an altitude for cell towers (always returns 0), so we
-        // just set it to null
-        val altitudeMeters = null
-        val verticalAccuracyMeters = null
-        return PositioningData(
-            latitude,
-            longitude,
-            pd.accuracy,
-            altitudeMeters,
-            verticalAccuracyMeters
-        )
     }
 }

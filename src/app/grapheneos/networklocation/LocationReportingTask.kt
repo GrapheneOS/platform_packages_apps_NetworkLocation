@@ -6,10 +6,6 @@ import android.location.provider.LocationProviderBase
 import android.location.provider.ProviderRequest
 import android.net.wifi.ScanResult
 import android.os.SystemClock
-import android.telephony.CellIdentityGsm
-import android.telephony.CellIdentityLte
-import android.telephony.CellIdentityNr
-import android.telephony.CellIdentityWcdma
 import android.telephony.CellInfo
 import android.util.Log
 import app.grapheneos.networklocation.cell.CellPositioningServiceCache
@@ -18,12 +14,13 @@ import app.grapheneos.networklocation.cell.CellScannerUnavailableException
 import app.grapheneos.networklocation.cell.CellTowerPositioningData
 import app.grapheneos.networklocation.cell.CellTowerScanner
 import app.grapheneos.networklocation.cell.Identifier
-import app.grapheneos.networklocation.cell.Standard
+import app.grapheneos.networklocation.cell.selectCellObservations
 import app.grapheneos.networklocation.interop.position_estimation.Coordinate
 import app.grapheneos.networklocation.interop.position_estimation.Measurement
 import app.grapheneos.networklocation.interop.position_estimation.Position
 import app.grapheneos.networklocation.interop.position_estimation.PositionEstimation
 import app.grapheneos.networklocation.wifi.Bssid
+import app.grapheneos.networklocation.wifi.selectWifiObservations
 import app.grapheneos.networklocation.wifi.WifiApPositioningData
 import app.grapheneos.networklocation.wifi.WifiApRanger
 import app.grapheneos.networklocation.wifi.WifiApScanner
@@ -40,7 +37,9 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runBlocking
 
 private const val TAG = "LocationReportingTask"
@@ -58,6 +57,7 @@ class LocationReportingTask(
         val interval = max(1000, request.intervalMillis)
         verboseLog(TAG) { "started, interval: $interval ms" }
         while (true) {
+            currentCoroutineContext().ensureActive()
             val start = SystemClock.elapsedRealtime()
             step()
             val stepDuration = SystemClock.elapsedRealtime() - start
@@ -77,6 +77,7 @@ class LocationReportingTask(
         } catch (e: Exception) {
             when (e) {
                 is WifiScannerUnavailableException, is WifiScanFailedException -> {
+
                     // stack trace is intentionally omitted, it doesn't contain useful info
                     Log.d(TAG, e.toString())
                     null
@@ -87,12 +88,15 @@ class LocationReportingTask(
         }
         if (scanResults != null) {
             val location = estimateLocationWifi(scanResults)
+            // Blocking lookup/native work may have completed after cancellation.
+            currentCoroutineContext().ensureActive()
             verboseLog(TAG) { "estimateLocationWifi returned $location" }
             if (location != null) {
                 provider.reportLocation(location)
                 return
             }
         }
+        currentCoroutineContext().ensureActive()
         verboseLog(TAG) { "falling back to cell-tower-based location" }
         val cellInfos = try {
             cellScanner.scan(request.workSource)
@@ -108,6 +112,7 @@ class LocationReportingTask(
             }
         }
         val location = estimateLocationCell(cellInfos)
+        currentCoroutineContext().ensureActive()
         verboseLog(TAG) { "estimateLocationCell returned $location" }
         if (location != null) {
             provider.reportLocation(location)
@@ -116,7 +121,7 @@ class LocationReportingTask(
 
     private class EstimatedDistance(
         var distance: Double,
-        /** 6-sigma² */
+        /** Squared RSSI interval half-width, or (6 * RTT standard deviation)². */
         var sixSigmaSquared: Double,
     )
 
@@ -132,12 +137,14 @@ class LocationReportingTask(
     )
 
     private fun estimateLocationWifi(scanResults: List<ScanResult>): Location? {
+        val observations = selectWifiObservations(scanResults, SystemClock.elapsedRealtimeNanos() / 1000)
+        if (observations.isEmpty()) return null
         var bestResults = HashMap<Bssid, PositionedScanResult>()
 
         val allPositioningData = mutableListOf<WifiApPositioningData>()
 
         try {
-            val bssids = scanResults.sortedByDescending { it.level }.map { it.BSSID }
+            val bssids = observations.entries.sortedByDescending { it.value.level }.map { it.key }
 
             // just in case the potential additional requests fail, add only cached ones
             allPositioningData.addAll(wifiService.getPositioningData(bssids, 0))
@@ -156,7 +163,7 @@ class LocationReportingTask(
         }
 
         for (data in allPositioningData) {
-            val scanResult = scanResults.find { it.BSSID == data.bssid }
+            val scanResult = observations[data.bssid]
             if (scanResult != null && data.positioningData != null) {
                 bestResults[data.bssid] =
                     PositionedScanResult(scanResult, data.positioningData, null)
@@ -213,14 +220,10 @@ class LocationReportingTask(
                 ScanResult.WIFI_BAND_6_GHZ -> -35.0
                 else -> continue
             }
-            val distanceLowerBound = rssiToDistance(
-                result.scanResult.level.toDouble(),
-                pathLossExponentHigher,
-                rssiAtOneMeter,
-            )
-            val distanceHigherBound = rssiToDistance(
+            val (distanceLowerBound, distanceHigherBound) = rssiDistanceBounds(
                 result.scanResult.level.toDouble(),
                 pathLossExponentLower,
+                pathLossExponentHigher,
                 rssiAtOneMeter,
             )
             val distance = (distanceHigherBound + distanceLowerBound) / 2.0
@@ -244,7 +247,7 @@ class LocationReportingTask(
         // or less of them being in a wildly incorrect location
         val refGeoPoint = GeoPoint(
             bestResults.values.map { it.positioningData.latitude }.median() ?: return null,
-            bestResults.values.map { it.positioningData.longitude }.median() ?: return null,
+            bestResults.values.map { it.positioningData.longitude }.medianLongitude() ?: return null,
             bestResults.values.mapNotNull { it.positioningData.altitudeMeters }.let {
                 if (it.isNotEmpty()) it.average() else null
             }
@@ -329,108 +332,7 @@ class LocationReportingTask(
     private fun estimateLocationCell(cellInfos: List<CellInfo>): Location? {
         val bestResults = HashMap<Identifier, PositionedCellInfo>()
 
-        val identifiers = cellInfos.mapNotNull {
-            val mcc = it.cellIdentity.mccString?.toIntOrNull() ?: return@mapNotNull null
-            val mnc = it.cellIdentity.mncString?.toIntOrNull() ?: return@mapNotNull null
-
-            val identifier = when (it.cellIdentity) {
-                is CellIdentityNr -> {
-                    val identity = it.cellIdentity as CellIdentityNr
-                    Identifier(
-                        Standard.NR,
-                        mcc,
-                        mnc,
-                        identity.tac.let { tac ->
-                            if (tac != CellInfo.UNAVAILABLE) {
-                                tac
-                            } else {
-                                return@mapNotNull null
-                            }
-                        },
-                        identity.nci.let { nci ->
-                            if (nci != CellInfo.UNAVAILABLE_LONG) {
-                                nci
-                            } else {
-                                return@mapNotNull null
-                            }
-                        }
-                    )
-                }
-
-                is CellIdentityLte -> {
-                    val identity = it.cellIdentity as CellIdentityLte
-                    Identifier(
-                        Standard.LTE,
-                        mcc,
-                        mnc,
-                        identity.tac.let { tac ->
-                            if (tac != CellInfo.UNAVAILABLE) {
-                                tac
-                            } else {
-                                return@mapNotNull null
-                            }
-                        },
-                        identity.ci.let { cellId ->
-                            if (cellId != CellInfo.UNAVAILABLE) {
-                                cellId
-                            } else {
-                                return@mapNotNull null
-                            }.toLong()
-                        }
-                    )
-                }
-
-                is CellIdentityWcdma -> {
-                    val identity = it.cellIdentity as CellIdentityWcdma
-                    Identifier(
-                        Standard.WCDMA,
-                        mcc,
-                        mnc,
-                        identity.lac.let { lac ->
-                            if (lac != CellInfo.UNAVAILABLE) {
-                                lac
-                            } else {
-                                return@mapNotNull null
-                            }
-                        },
-                        identity.cid.let { cellId ->
-                            if (cellId != CellInfo.UNAVAILABLE) {
-                                cellId
-                            } else {
-                                return@mapNotNull null
-                            }.toLong()
-                        }
-                    )
-                }
-
-                is CellIdentityGsm -> {
-                    val identity = it.cellIdentity as CellIdentityGsm
-                    Identifier(
-                        Standard.GSM,
-                        mcc,
-                        mnc,
-                        identity.lac.let { lac ->
-                            if (lac != CellInfo.UNAVAILABLE) {
-                                lac
-                            } else {
-                                return@mapNotNull null
-                            }
-                        },
-                        identity.cid.let { cellId ->
-                            if (cellId != CellInfo.UNAVAILABLE) {
-                                cellId
-                            } else {
-                                return@mapNotNull null
-                            }.toLong()
-                        }
-                    )
-                }
-
-                else -> return@mapNotNull null
-            }
-
-            Pair(identifier, it)
-        }.toMap()
+        val identifiers = selectCellObservations(cellInfos, SystemClock.elapsedRealtime())
 
         if (identifiers.isEmpty()) {
             return null
@@ -476,7 +378,7 @@ class LocationReportingTask(
         // or less of them being in a wildly incorrect location
         val refGeoPoint = GeoPoint(
             bestResults.values.map { it.positioningData.latitude }.median() ?: return null,
-            bestResults.values.map { it.positioningData.longitude }.median() ?: return null,
+            bestResults.values.map { it.positioningData.longitude }.medianLongitude() ?: return null,
             bestResults.values.mapNotNull { it.positioningData.altitudeMeters }.let {
                 if (it.isNotEmpty()) it.average() else null
             }
@@ -493,8 +395,8 @@ class LocationReportingTask(
                 ),
                 refGeoPoint
             )
-            // the accuracyMeters for cell towers is the range of where the device could be located
-            // if it can see the tower
+            // Treat the raw cell database scale as a coverage/proximity
+            // tolerance. Its confidence level is not established.
             val xyPositionVariance = positioningData.accuracyMeters.toDouble().pow(2)
             val zPositionVariance = positioningData.verticalAccuracyMeters?.toDouble()?.pow(2)
             Measurement(
@@ -540,6 +442,7 @@ class LocationReportingTask(
         val estimatedGeoPoint = enuPointToGeoPoint(enuPoint, refGeoPoint)
         loc.longitude = estimatedGeoPoint.longitude
         loc.latitude = estimatedGeoPoint.latitude
+        // Cellular reports the square-root scale directly; Wi-Fi applies /6.
         loc.accuracy = sqrt(max(result.x.sixSigmaSquared, result.y.sixSigmaSquared)).toFloat()
         estimatedGeoPoint.altitude?.let { estimatedAltitude ->
             loc.altitude = estimatedAltitude

@@ -2,7 +2,6 @@
 
 use std::ops::{Add, Div};
 
-use crate::multilateration::multilateration;
 use itertools::Itertools;
 use measurement::Measurement;
 use position::Position;
@@ -16,9 +15,9 @@ pub mod position;
 /// Estimated position.
 pub struct EstimatedPosition {
     /// estimated position
-    position: Position,
+    pub position: Position,
     /// inliers size
-    inliers_size: usize,
+    pub inliers_size: usize,
 }
 
 struct Candidate {
@@ -30,6 +29,44 @@ struct Candidate {
  * Estimate a position using robust methods.
  */
 pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPosition> {
+    let valid: Vec<_> = measurements
+        .iter()
+        .copied()
+        .filter(|m| valid_position(m.position) && m.distance.is_finite() && m.distance >= 0.0)
+        .collect();
+    fn checked(m: &mut [Measurement], initial: Option<Position>, iterations: usize) -> Position {
+        crate::multilateration::multilateration_checked(m, initial, iterations).unwrap_or_default()
+    }
+    estimate_position_internal(&valid, checked)
+}
+
+fn valid_position(p: Position) -> bool {
+    p.number_of_real() > 0
+        && [p.x, p.y, p.z].iter().all(|c| {
+            c.value.is_finite() && c.six_sigma_squared.is_finite() && c.six_sigma_squared >= 0.0
+        })
+}
+
+fn is_inlier(measurement: Measurement, position: Position) -> bool {
+    let dx = position.x.value - measurement.position.x.value;
+    let dy = position.y.value - measurement.position.y.value;
+    let dz = position.z.value - measurement.position.z.value;
+    let estimated_distance = (dx.powi(2) + dy.powi(2) + dz.powi(2)).sqrt();
+    let residual = (estimated_distance - measurement.distance).abs();
+    // This is the solver's existing consensus tolerance, not a calibrated
+    // standard deviation or a conversion of database accuracy confidence.
+    let scale = (measurement.position.x.six_sigma_squared
+        + measurement.position.y.six_sigma_squared
+        + measurement.position.z.six_sigma_squared)
+        .sqrt()
+        .max(f64::MIN_POSITIVE);
+    residual / scale <= 2.0
+}
+
+fn estimate_position_internal(
+    measurements: &[Measurement],
+    solve: fn(&mut [Measurement], Option<Position>, usize) -> Position,
+) -> Option<EstimatedPosition> {
     if measurements.is_empty() {
         return None;
     }
@@ -72,27 +109,14 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
 
         let initial_guess = Position::average(&sample.iter().map(|m| m.position).collect_vec());
 
-        let candidate_position = multilateration(&mut  sample, Some(initial_guess), 50);
+        let candidate_position = solve(&mut sample, Some(initial_guess), 50);
+        if !valid_position(candidate_position) {
+            continue;
+        }
 
         candidate_inliers_indices.clear();
         for (index, measurement) in measurements.iter().enumerate() {
-            let dx = candidate_position.x.value - measurement.position.x.value;
-            let dy = candidate_position.y.value - measurement.position.y.value;
-            let dz = candidate_position.z.value - measurement.position.z.value;
-
-            let estimated_distance = (dx.powi(2) + dy.powi(2) + dz.powi(2)).sqrt();
-            let residual = (estimated_distance - measurement.distance).abs();
-            let standard_deviation = (measurement.position.x.six_sigma_squared
-                + measurement.position.y.six_sigma_squared
-                + measurement.position.z.six_sigma_squared)
-                .sqrt()
-                // Prevent division by zero.
-                .max(f64::MIN_POSITIVE);
-            let standardized_residual = residual / standard_deviation;
-            // within 2 standard deviations
-            let threshold = 2.0;
-
-            if standardized_residual <= threshold {
+            if is_inlier(*measurement, candidate_position) {
                 candidate_inliers_indices.push(index);
             }
         }
@@ -119,9 +143,9 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
                 && candidate.position.x.six_sigma_squared
                     + candidate.position.y.six_sigma_squared
                     + candidate.position.z.six_sigma_squared
-                    < best.position.x.six_sigma_squared
+                    < (best.position.x.six_sigma_squared
                         + best.position.y.six_sigma_squared
-                        + best.position.z.six_sigma_squared)
+                        + best.position.z.six_sigma_squared))
         {
             candidate
         } else {
@@ -131,7 +155,7 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
 
     if let Some(best_candidate) = best_candidate {
         if best_candidate.inliers_indices.len() >= min_inliers {
-            let final_estimated_position = multilateration(
+            let final_estimated_position = solve(
                 &mut best_candidate
                     .inliers_indices
                     .iter()
@@ -140,11 +164,15 @@ pub fn estimate_position(measurements: &[Measurement]) -> Option<EstimatedPositi
                 Some(best_candidate.position),
                 1000.div(best_candidate.inliers_indices.len()).max(3),
             );
+            if !valid_position(final_estimated_position) {
+                return None;
+            }
 
-            Some(EstimatedPosition {
+            let result = EstimatedPosition {
                 position: final_estimated_position,
                 inliers_size: best_candidate.inliers_indices.len(),
-            })
+            };
+            Some(result)
         } else {
             None
         }

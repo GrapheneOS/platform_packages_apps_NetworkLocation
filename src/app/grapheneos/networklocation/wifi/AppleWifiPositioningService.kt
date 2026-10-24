@@ -2,9 +2,9 @@ package app.grapheneos.networklocation.wifi
 
 import android.util.Log
 import app.grapheneos.networklocation.ApplePositioningService
+import app.grapheneos.networklocation.convertAppleWifiPositioningData
 import app.grapheneos.networklocation.PositioningData
 import app.grapheneos.networklocation.Throttle
-import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocation
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationRequest
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationResponse
 import app.grapheneos.networklocation.proto.AppleWpsProtos.WirelessAP
@@ -51,7 +51,7 @@ class AppleWifiPositioningService : WifiPositioningService {
                 Log.w(TAG, "invalid bssid ${ap.macId}")
                 continue
             }
-            result.putIfAbsent(apBssid, convertPositioningData(ap.location))
+            result.putIfAbsent(apBssid, convertAppleWifiPositioningData(ap.location.takeIf { ap.hasLocation() }))
         }
         for (bssid in requestBssids) {
             result.putIfAbsent(bssid, null)
@@ -91,28 +91,11 @@ class AppleWifiPositioningService : WifiPositioningService {
             response.wirelessApsList.forEachIndexed { i, ap ->
                 Log.v(
                     EXTRA_VERBOSE_TAG, "response[$i]: bssid: ${ap.macId}, " +
-                            "positioning data: ${convertPositioningData(ap.location)}"
+                            "positioning data: ${convertAppleWifiPositioningData(ap.location.takeIf { ap.hasLocation() })}"
                 )
             }
         }
         return response
-    }
-
-    private fun convertPositioningData(pd: ALSLocation): PositioningData? {
-        if (pd.latitude == -18000000000) {
-            return null
-        }
-        val latitude = pd.latitude * 0.000_000_01;
-        val longitude = pd.longitude * 0.000_000_01
-        val altitudeMeters = pd.altitude.let {
-            // the api returns -100 or -50000 for unknown altitude
-            if ((it == -100) || (it == -50000)) null else it / 100
-        }
-        val verticalAccuracyMeters = pd.verticalAccuracy.let {
-            // the api returns -100 for unknown vertical accuracy (altitude accuracy)
-            if (it == -100 || altitudeMeters == null) null else it / 100
-        }
-        return PositioningData(latitude, longitude, pd.accuracy, altitudeMeters, verticalAccuracyMeters)
     }
 }
 
