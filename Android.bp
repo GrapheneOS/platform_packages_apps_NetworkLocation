@@ -46,3 +46,18 @@ prebuilt_etc {
     sub_dir: "sysconfig",
     filename_from_src: true,
 }
+
+java_test_host {
+    name: "NetworkLocationGeocodeTests",
+    srcs: [
+        "tests/src/app/grapheneos/geocoder/GeocodeJsonTest.kt",
+        "src/app/grapheneos/geocoder/GeocodeJson.kt",
+    ],
+    kotlincflags: ["-Xplugin=external/kotlinc/lib/kotlinx-serialization-compiler-plugin.jar"],
+    static_libs: [
+        "junit",
+        "kotlinx_serialization_core",
+        "kotlinx_serialization_json",
+    ],
+    test_suites: ["general-tests"],
+}

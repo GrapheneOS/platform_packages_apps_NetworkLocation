@@ -60,6 +60,12 @@ data class GeocodeJson(
         data class Geometry(
             val coordinates: List<Double>,
             val type: String,
-        )
+        ) {
+            init {
+                require(coordinates.size >= 2) { "missing geocoder coordinates" }
+                require(coordinates[0] in -180.0..180.0) { "invalid geocoder longitude" }
+                require(coordinates[1] in -90.0..90.0) { "invalid geocoder latitude" }
+            }
+        }
     }
 }
