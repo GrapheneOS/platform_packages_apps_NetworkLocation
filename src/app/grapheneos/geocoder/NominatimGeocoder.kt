@@ -10,6 +10,7 @@ import android.location.Address
 import android.os.Bundle
 import android.util.Log
 import androidx.core.os.toPersistableBundle
+import app.grapheneos.readBoundedBytes
 import app.grapheneos.verboseLog
 import java.io.IOException
 import java.net.URL
@@ -23,6 +24,8 @@ import org.grapheneos.tls.ModernTLSSocketFactory
 
 private const val TAG = "NominatimGeocoder"
 private const val EXTRA_VERBOSE_TAG = "NominatimGeocoderVV"
+
+private const val MAX_RESPONSE_BYTES = 1024 * 1024
 
 /** Version which should get incremented when request behavior changes */
 private const val USER_AGENT_VERSION = 1
@@ -98,7 +101,7 @@ class NominatimGeocoder : Geocoder {
                 throw IOException("non-200 response code: $responseCode")
             }
             connection.inputStream.use { inputStream ->
-                inputStream.readAllBytes()
+                inputStream.readBoundedBytes(MAX_RESPONSE_BYTES)
             }
         } finally {
             connection.disconnect()

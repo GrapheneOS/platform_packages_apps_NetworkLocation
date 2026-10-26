@@ -8,9 +8,12 @@ import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_DISABLED
 import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_GRAPHENEOS_APPLE_PROXY
 import android.ext.settings.NetworkLocationSettings.NETWORK_LOCATION_SETTING
 import android.util.Log
+import app.grapheneos.networklocation.ApplePositioningServiceLimits.MAX_RESPONSE_BYTES
+import app.grapheneos.networklocation.ApplePositioningServiceLimits.RESPONSE_HEADER_BYTES
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationRequest
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationRequest.ALSMeta
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocationResponse
+import app.grapheneos.readBoundedBytes
 import app.grapheneos.verboseLog
 import java.io.DataOutputStream
 import java.io.IOException
@@ -71,10 +74,10 @@ class ApplePositioningService {
             if (responseCode != HttpsURLConnection.HTTP_OK) {
                 throw IOException("non-200 response code: $responseCode")
             }
-            val ignoredHeaderSize = 10
+            val ignoredHeaderSize = RESPONSE_HEADER_BYTES
             val protoBytes: ByteArray = connection.inputStream.use { inputStream ->
                 inputStream.skipNBytes(ignoredHeaderSize.toLong())
-                inputStream.readAllBytes()
+                inputStream.readBoundedBytes(MAX_RESPONSE_BYTES - ignoredHeaderSize)
             }
             val response = ALSLocationResponse.parseFrom(protoBytes)
             verboseLog(TAG) {

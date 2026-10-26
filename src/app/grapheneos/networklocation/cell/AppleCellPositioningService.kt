@@ -2,6 +2,10 @@ package app.grapheneos.networklocation.cell
 
 import android.util.Log
 import app.grapheneos.networklocation.ApplePositioningService
+import app.grapheneos.networklocation.ApplePositioningServiceLimits.BASELINE_ADDITIONAL_TOWERS
+import app.grapheneos.networklocation.ApplePositioningServiceLimits.MAX_ADDITIONAL_TOWERS
+import app.grapheneos.networklocation.ApplePositioningServiceLimits.MAX_REQUEST_TOWERS
+import app.grapheneos.networklocation.ApplePositioningServiceLimits.THROTTLED_ADDITIONAL_TOWERS
 import app.grapheneos.networklocation.PositioningData
 import app.grapheneos.networklocation.Throttle
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocation
@@ -19,9 +23,6 @@ import kotlin.time.Duration.Companion.seconds
 private const val TAG = "AppleCps"
 private const val EXTRA_VERBOSE_TAG = "AppleCpsVV"
 
-private const val MAX_REQUEST_TOWERS = 12
-private const val THROTTLED_ADDITIONAL_RESULTS = 4
-private const val MAX_ADDITIONAL_RESULTS = 25
 private const val THROTTLE_TRIGGER_RESULT_COUNT = 10
 
 class AppleCellPositioningService : CellPositioningService {
@@ -36,9 +37,9 @@ class AppleCellPositioningService : CellPositioningService {
 
         val response = fetchInner(
             requestIdentifiers, if (throttle.isThrottled()) {
-                THROTTLED_ADDITIONAL_RESULTS
+                THROTTLED_ADDITIONAL_TOWERS
             } else {
-                MAX_ADDITIONAL_RESULTS
+                MAX_ADDITIONAL_TOWERS
             }
         )
 
@@ -152,7 +153,7 @@ class AppleCellPositioningService : CellPositioningService {
             }
 
             // Apple's service returns more additional results than we request
-            val baselineMaxAdditionalResults = 19
+            val baselineMaxAdditionalResults = BASELINE_ADDITIONAL_TOWERS
             val adjustedMaxAdditionalResults = if (maxAdditionalResults > baselineMaxAdditionalResults) {
                 maxAdditionalResults - baselineMaxAdditionalResults
             } else if (maxAdditionalResults == 0) {

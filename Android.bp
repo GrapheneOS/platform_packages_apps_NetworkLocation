@@ -33,6 +33,23 @@ android_app {
     ],
 }
 
+java_test_host {
+    name: "NetworkLocationResponseTests",
+    srcs: [
+        "tests/src/app/grapheneos/InputStreamTest.kt",
+        "tests/src/app/grapheneos/networklocation/ApplePositioningResponseSizeTest.kt",
+        "src/app/grapheneos/InputStream.kt",
+        "src/app/grapheneos/networklocation/ApplePositioningServiceLimits.kt",
+        "proto/apple_wps.proto",
+    ],
+    proto: {
+        type: "full",
+        canonical_path_from_root: false,
+    },
+    static_libs: ["junit", "libprotobuf-java-full"],
+    test_suites: ["general-tests"],
+}
+
 prebuilt_etc {
     name: "etc_permissions_app.grapheneos.networklocation.xml",
     src: "etc/permissions/app.grapheneos.networklocation.xml",

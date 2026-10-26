@@ -2,6 +2,9 @@ package app.grapheneos.networklocation.wifi
 
 import android.util.Log
 import app.grapheneos.networklocation.ApplePositioningService
+import app.grapheneos.networklocation.ApplePositioningServiceLimits.MAX_ADDITIONAL_APS
+import app.grapheneos.networklocation.ApplePositioningServiceLimits.MAX_REQUEST_APS
+import app.grapheneos.networklocation.ApplePositioningServiceLimits.THROTTLED_ADDITIONAL_APS
 import app.grapheneos.networklocation.PositioningData
 import app.grapheneos.networklocation.Throttle
 import app.grapheneos.networklocation.proto.AppleWpsProtos.ALSLocation
@@ -16,9 +19,6 @@ import kotlin.time.Duration.Companion.seconds
 private const val TAG = "AppleWps"
 private const val EXTRA_VERBOSE_TAG = "AppleWpsVV"
 
-private const val MAX_REQUEST_NETWORKS = 40
-private const val THROTTLED_ADDITIONAL_RESULTS = 8
-private const val MAX_ADDITIONAL_RESULTS = 100
 private const val THROTTLE_TRIGGER_RESULT_COUNT = 17
 
 class AppleWifiPositioningService : WifiPositioningService {
@@ -28,15 +28,15 @@ class AppleWifiPositioningService : WifiPositioningService {
 
     @Throws(IOException::class)
     override fun fetchNearbyApPositioningData(bssids: List<String>): List<WifiApPositioningData> {
-        val requestBssids = bssids.take(MAX_REQUEST_NETWORKS)
+        val requestBssids = bssids.take(MAX_REQUEST_APS)
         val result = HashMap<Bssid, PositioningData?>()
 
         val response = fetchInner(
             requestBssids,
             if (throttle.isThrottled()) {
-                THROTTLED_ADDITIONAL_RESULTS
+                THROTTLED_ADDITIONAL_APS
             } else {
-                MAX_ADDITIONAL_RESULTS
+                MAX_ADDITIONAL_APS
             }
         )
 
